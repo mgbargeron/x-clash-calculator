@@ -1,0 +1,58 @@
+{
+  "name": "x-clash-chest-multiplier",
+  "version": "1.0.0",
+  "description": "Electron + React 19 + Vite app",
+  "main": "electron/main.js",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently -k \"npm:dev:renderer\" \"npm:dev:electron\"",
+    "dev:renderer": "vite",
+    "dev:electron": "wait-on tcp:5173 && cross-env VITE_DEV_SERVER_URL=http://localhost:5173 electron .",
+    "build": "npm-run-all build:renderer",
+    "build:renderer": "vite build",
+    "preview": "vite preview",
+    "dist": "npm run build && electron-builder",
+    "dist:mac": "npm run build && electron-builder --mac",
+    "dist:mac:x64": "npm run build && electron-builder --mac --x64",
+    "dist:win:x64": "npm run build && electron-builder --win --x64",
+    "dist:all": "npm run dist:mac && npm run dist:mac:x64 && npm run dist:win:x64"
+  },
+  "dependencies": {
+    "decimal.js": "^10.6.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "6.0.1",
+    "concurrently": "^9.0.1",
+    "cross-env": "10.1.0",
+    "electron": "41.0.2",
+    "electron-builder": "26.8.1",
+    "npm-run-all": "^4.1.5",
+    "typescript": "^5.5.3",
+    "vite": "8.0.0",
+    "wait-on": "9.0.4 "
+  },
+  "build": {
+    "appId": "com.example.chestmultiplier",
+    "productName": "Chest Multiplier",
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "directories": {
+      "output": "releases"
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": "x-clash-calculator.icns"
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "x-clash-calculator.ico"
+    }
+  }
+}
