@@ -285,19 +285,39 @@ h1 {
     background: #6a2f3b;
 }
 
-.tile-coordinate {
-    position: absolute;
-    top: 3px;
-    left: 4px;
-    font-size: 0.55rem;
-    line-height: 1;
-    color: rgba(245, 247, 255, 0.76);
+.map-tile.town {
+    background: #232338;
 }
 
-.tile-marker {
-    font-size: 1.15rem;
-    font-weight: 800;
-    text-transform: uppercase;
+.map-tile.frostMine {
+    background: #172035;
+}
+
+.town-level {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 26px;
+    height: 24px;
+    background: #d8aa32;
+    clip-path: polygon(25% 4%, 75% 4%, 100% 50%, 75% 96%, 25% 96%, 0 50%);
+}
+
+.town-level::before {
+    content: "";
+    position: absolute;
+    inset: 2px;
+    background: #9d1f25;
+    clip-path: inherit;
+}
+
+.town-level span {
+    position: relative;
+    z-index: 1;
+    color: #ffe7a5;
+    font-size: 0.82rem;
+    font-weight: 900;
+    line-height: 1;
 }
 
 .tile-tools {

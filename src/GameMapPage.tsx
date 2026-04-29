@@ -115,22 +115,25 @@ function MapBoard({
 
           return (
             <button
-              className={`map-tile ${tile.type} ${
+              className={`map-tile ${tile.type} ${tileConfig.kind} ${
                 selectedTileId === tileConfig.id ? "selected" : ""
               }`}
               type="button"
               key={tileConfig.id}
               onClick={() => onPaintTile(tileConfig.id, selectedType)}
               onFocus={() => onSelectTile(tileConfig.id)}
-              aria-label={`Map tile ${getCoordinate(tileConfig)} ${tile.type}`}
-              title={tile.note || getCoordinate(tileConfig)}
+              aria-label={`Map tile ${getCoordinate(tileConfig)} ${tileConfig.kind} level ${tileConfig.level}`}
+              title={tile.note || `${getCoordinate(tileConfig)} ${tileConfig.kind} level ${tileConfig.level}`}
               style={{
                 gridColumn: `${tileConfig.x} / span ${tileConfig.width}`,
                 gridRow: `${tileConfig.y} / span ${tileConfig.height}`,
               }}
             >
-              <span className="tile-coordinate">{tileConfig.label ?? getCoordinate(tileConfig)}</span>
-              <span className="tile-marker">{tile.type === "empty" ? "" : tile.type[0]}</span>
+              {tileConfig.kind === "town" ? (
+                <span className="town-level">
+                  <span>{tileConfig.level}</span>
+                </span>
+              ) : null}
             </button>
           );
         })}
