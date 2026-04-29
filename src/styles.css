@@ -127,6 +127,7 @@ body {
 .map-page {
     display: grid;
     gap: 22px;
+    width: 100%;
 }
 
 .page-title-row {
@@ -169,17 +170,30 @@ h1 {
 }
 
 .map-layout {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 280px;
-    gap: 20px;
-    align-items: start;
+    width: 100%;
+    min-width: 0;
+}
+
+.map-toolbar {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    width: 100%;
+    padding: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    background: rgba(7, 10, 20, 0.45);
 }
 
 .map-board {
+    --map-columns: 20;
+    --map-rows: 20;
     display: grid;
-    grid-template-columns: repeat(12, minmax(42px, 1fr));
-    gap: 6px;
+    grid-template-columns: repeat(var(--map-columns), minmax(0, 1fr));
+    grid-template-rows: repeat(var(--map-rows), minmax(0, 1fr));
+    gap: 4px;
     width: 100%;
+    aspect-ratio: var(--map-columns) / var(--map-rows);
     min-width: 0;
 }
 
@@ -187,8 +201,8 @@ h1 {
     position: relative;
     display: grid;
     place-items: center;
-    aspect-ratio: 1;
     min-width: 0;
+    min-height: 0;
     border: 1px solid rgba(255, 255, 255, 0.14);
     border-radius: 8px;
     color: #f5f7ff;
@@ -234,25 +248,22 @@ h1 {
     text-transform: uppercase;
 }
 
-.map-panel {
-    display: grid;
-    gap: 16px;
-}
-
 .tile-tools {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
+    display: flex;
+    flex-wrap: wrap;
     gap: 8px;
+    width: 100%;
 }
 
 .tool-button {
+    flex: 1 1 110px;
     min-height: 42px;
     padding: 0 10px;
     border-radius: 8px;
 }
 
 .tool-button.empty {
-    grid-column: 1 / -1;
+    flex-grow: 0.75;
 }
 
 .tool-button.base {
@@ -272,14 +283,24 @@ h1 {
 }
 
 .map-summary {
-    display: grid;
+    display: flex;
+    flex-wrap: wrap;
     gap: 8px;
+}
+
+.map-details {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(260px, 420px);
+    gap: 18px;
+    align-items: start;
 }
 
 .summary-row {
     display: flex;
     justify-content: space-between;
     gap: 12px;
+    min-width: 150px;
+    flex: 1 1 150px;
     padding: 10px 12px;
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 8px;
@@ -437,11 +458,7 @@ h1 {
         background: rgba(255, 255, 255, 0.05);
     }
 
-    .map-layout {
+    .map-details {
         grid-template-columns: 1fr;
-    }
-
-    .map-board {
-        grid-template-columns: repeat(6, minmax(38px, 1fr));
     }
 }
