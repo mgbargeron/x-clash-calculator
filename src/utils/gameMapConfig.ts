@@ -204,7 +204,6 @@ export const defaultGameMapConfig: GameMapConfig = {
     { id: "r09-c08", x: 8, y: 9, width: 1, height: 1 },
     { id: "r09-c09", x: 9, y: 9, width: 1, height: 1 },
     { id: "r09-c10", x: 10, y: 9, width: 2, height: 1 },
-    { id: "r09-c11", x: 11, y: 9, width: 1, height: 1 },
     { id: "r09-c12", x: 12, y: 9, width: 1, height: 1 },
     { id: "r09-c13", x: 13, y: 9, width: 1, height: 1 },
     { id: "r09-c14", x: 14, y: 9, width: 1, height: 1 },
