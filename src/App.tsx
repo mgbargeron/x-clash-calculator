@@ -2,6 +2,7 @@ import CalculationTable from "./CalculationTable";
 import {useEffect, useState} from "react";
 import {sanitizeNumericInput} from "./utils/sanatizeNumericInput";
 import {formatInputValue} from "./utils/formatInputValue";
+import GameMapPage from "./GameMapPage";
 
 export type Row = {
   description: string;
@@ -59,6 +60,7 @@ const getInitialHeroExpRows = (values: string[]): Row[] => [
 
 const columnHeaders = ["Blue Chest", "Purple Chest", "Legendary Chest"];
 const rowHeaders = ["Resources", "Gold", "Hero exp"];
+type Page = "calculator" | "map";
 
 function loadInitialGridValues(): string[][] {
   try {
@@ -84,7 +86,7 @@ function loadInitialGridValues(): string[][] {
   }
 }
 
-export default function App() {
+function CalculatorPage() {
   const [gridValues, setGridValues] = useState<string[][]>(() => loadInitialGridValues());
 
   useEffect(() => {
@@ -108,76 +110,99 @@ export default function App() {
   const initialHeroExpRows: Row[] = getInitialHeroExpRows(gridValues[2]);
 
   return (
-    <main className="app">
-      <section className="card calculator">
-        <p className="eyebrow">Auto total calculator</p>
-        <h1>Chest Value × Quantity</h1>
-        <p className="description">
-          Enter a value and quantity for each row. Totals update automatically.
-        </p>
+    <section className="card calculator">
+      <p className="eyebrow">Auto total calculator</p>
+      <h1>Chest Value × Quantity</h1>
+      <p className="description">
+        Enter a value and quantity for each row. Totals update automatically.
+      </p>
 
+      <div className="tables-container">
+        <div className="table">
+          <div className="table-header"></div>
+          {columnHeaders.map((header) => (
+            <div className="table-header" key={header}>
+              {header}
+            </div>
+          ))}
+
+          {rowHeaders.map((rowLabel, rowIndex) => (
+            <div className="table-row" key={rowLabel}>
+              <div className="cell-display">{rowLabel}</div>
+              {columnHeaders.map((_, columnIndex) => (
+                <input
+                  key={`${rowIndex}-${columnIndex}`}
+                  className="cell-input"
+                  type="text"
+                  inputMode="decimal"
+                  placeholder="0"
+                  value={formatInputValue(gridValues[rowIndex][columnIndex])}
+                  onChange={(event) =>
+                    updateGridCell(rowIndex, columnIndex, event.target.value)
+                  }
+                />
+              ))}
+            </div>
+          ))}
+        </div>
 
         <div className="tables-container">
-          <div className="table">
-            <div className="table-header"></div>
-            {columnHeaders.map((header) => (
-              <div className="table-header" key={header}>
-                {header}
-              </div>
-            ))}
-
-            {rowHeaders.map((rowLabel, rowIndex) => (
-              <div className="table-row" key={rowLabel}>
-                <div className="cell-display">{rowLabel}</div>
-                {columnHeaders.map((_, columnIndex) => (
-                  <input
-                    key={`${rowIndex}-${columnIndex}`}
-                    className="cell-input"
-                    type="text"
-                    inputMode="decimal"
-                    placeholder="0"
-                    value={formatInputValue(gridValues[rowIndex][columnIndex])}
-                    onChange={(event) =>
-                      updateGridCell(rowIndex, columnIndex, event.target.value)
-                    }
-                  />
-                ))}
-              </div>
-            ))}
+          <div className="calculator-wrapper">
+            <CalculationTable
+              initialRows={initialWheatRows}
+              resourceName="Wheat"
+              storageKey={WHEAT_STORAGE_KEY}
+            />
           </div>
-
-          <div className="tables-container">
-            <div className="calculator-wrapper">
-              <CalculationTable
-                initialRows={initialWheatRows}
-                resourceName="Wheat"
-                storageKey={WHEAT_STORAGE_KEY}
-              />
-            </div>
-            <div className="calculator-wrapper">
-              <CalculationTable
-                initialRows={initialIronRows}
-                resourceName="Iron"
-                storageKey={IRON_STORAGE_KEY}
-              />
-            </div>
-            <div className="calculator-wrapper">
-              <CalculationTable
-                initialRows={initialGoldRows}
-                resourceName="Gold"
-                storageKey={GOLD_STORAGE_KEY}
-              />
-            </div>
-            <div className="calculator-wrapper">
-              <CalculationTable
-                initialRows={initialHeroExpRows}
-                resourceName="Hero Exp"
-                storageKey={HERO_EXP_STORAGE_KEY}
-              />
-            </div>
+          <div className="calculator-wrapper">
+            <CalculationTable
+              initialRows={initialIronRows}
+              resourceName="Iron"
+              storageKey={IRON_STORAGE_KEY}
+            />
+          </div>
+          <div className="calculator-wrapper">
+            <CalculationTable
+              initialRows={initialGoldRows}
+              resourceName="Gold"
+              storageKey={GOLD_STORAGE_KEY}
+            />
+          </div>
+          <div className="calculator-wrapper">
+            <CalculationTable
+              initialRows={initialHeroExpRows}
+              resourceName="Hero Exp"
+              storageKey={HERO_EXP_STORAGE_KEY}
+            />
           </div>
         </div>
-      </section>
+      </div>
+    </section>
+  );
+}
+
+export default function App() {
+  const [page, setPage] = useState<Page>("calculator");
+
+  return (
+    <main className="app">
+      <nav className="app-nav" aria-label="Primary navigation">
+        <button
+          className={`nav-button ${page === "calculator" ? "active" : ""}`}
+          type="button"
+          onClick={() => setPage("calculator")}
+        >
+          Calculator
+        </button>
+        <button
+          className={`nav-button ${page === "map" ? "active" : ""}`}
+          type="button"
+          onClick={() => setPage("map")}
+        >
+          Game Map
+        </button>
+      </nav>
+      {page === "calculator" ? <CalculatorPage /> : <GameMapPage />}
     </main>
   );
 }

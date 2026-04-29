@@ -63,10 +63,50 @@ body {
 .app {
     min-height: 100vh;
     display: grid;
-    place-items: center;
+    align-content: start;
+    justify-items: center;
+    gap: 18px;
     padding: 24px;
     background:
             radial-gradient(circle at top, #1c2445 0%, #0f1220 55%);
+}
+
+.app-nav {
+    display: inline-flex;
+    gap: 8px;
+    padding: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 12px;
+    background: rgba(7, 10, 20, 0.72);
+}
+
+.nav-button,
+.secondary-button,
+.tool-button {
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    color: #f5f7ff;
+    background: rgba(255, 255, 255, 0.08);
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.nav-button {
+    min-width: 118px;
+    min-height: 40px;
+    border-radius: 8px;
+}
+
+.nav-button.active,
+.tool-button.active {
+    border-color: #9db1ff;
+    background: #33447a;
+}
+
+.secondary-button {
+    min-height: 40px;
+    padding: 0 16px;
+    border-radius: 8px;
 }
 
 .card {
@@ -82,6 +122,18 @@ body {
 .calculator {
     display: grid;
     gap: 20px;
+}
+
+.map-page {
+    display: grid;
+    gap: 22px;
+}
+
+.page-title-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
 }
 
 .calculator-wrapper {
@@ -114,6 +166,150 @@ h1 {
     align-items: center;
     justify-content: center;
     gap: 20px;
+}
+
+.map-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 280px;
+    gap: 20px;
+    align-items: start;
+}
+
+.map-board {
+    display: grid;
+    grid-template-columns: repeat(12, minmax(42px, 1fr));
+    gap: 6px;
+    width: 100%;
+    min-width: 0;
+}
+
+.map-tile {
+    position: relative;
+    display: grid;
+    place-items: center;
+    aspect-ratio: 1;
+    min-width: 0;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 8px;
+    color: #f5f7ff;
+    background: #172035;
+    cursor: pointer;
+    overflow: hidden;
+}
+
+.map-tile:focus-visible,
+.map-tile.selected {
+    outline: 3px solid rgba(157, 177, 255, 0.78);
+    outline-offset: 1px;
+}
+
+.map-tile.base {
+    background: #24524b;
+}
+
+.map-tile.rally {
+    background: #315186;
+}
+
+.map-tile.farm {
+    background: #5b6130;
+}
+
+.map-tile.threat {
+    background: #6a2f3b;
+}
+
+.tile-coordinate {
+    position: absolute;
+    top: 5px;
+    left: 6px;
+    font-size: 0.7rem;
+    line-height: 1;
+    color: rgba(245, 247, 255, 0.76);
+}
+
+.tile-marker {
+    font-size: 1.15rem;
+    font-weight: 800;
+    text-transform: uppercase;
+}
+
+.map-panel {
+    display: grid;
+    gap: 16px;
+}
+
+.tile-tools {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+
+.tool-button {
+    min-height: 42px;
+    padding: 0 10px;
+    border-radius: 8px;
+}
+
+.tool-button.empty {
+    grid-column: 1 / -1;
+}
+
+.tool-button.base {
+    border-color: rgba(104, 209, 188, 0.5);
+}
+
+.tool-button.rally {
+    border-color: rgba(116, 158, 235, 0.55);
+}
+
+.tool-button.farm {
+    border-color: rgba(212, 220, 107, 0.48);
+}
+
+.tool-button.threat {
+    border-color: rgba(239, 111, 132, 0.58);
+}
+
+.map-summary {
+    display: grid;
+    gap: 8px;
+}
+
+.summary-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 12px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.07);
+}
+
+.note-field {
+    display: grid;
+    gap: 8px;
+    color: #d9def7;
+    font-weight: 700;
+}
+
+.note-field textarea {
+    width: 100%;
+    min-height: 120px;
+    resize: vertical;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 8px;
+    background: rgba(10, 14, 28, 0.7);
+    color: #ffffff;
+    padding: 12px 14px;
+    font: inherit;
+    line-height: 1.4;
+    outline: none;
+}
+
+.note-field textarea:focus {
+    border-color: #6d8cff;
+    box-shadow: 0 0 0 3px rgba(109, 140, 255, 0.2);
 }
 
 
@@ -201,8 +397,26 @@ h1 {
 }
 
 @media (max-width: 640px) {
+    .app {
+        padding: 16px;
+    }
+
     .card {
         padding: 24px;
+    }
+
+    .app-nav {
+        width: 100%;
+    }
+
+    .nav-button {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .page-title-row {
+        align-items: start;
+        flex-direction: column;
     }
 
     .table {
@@ -221,5 +435,13 @@ h1 {
         padding: 14px;
         border-radius: 16px;
         background: rgba(255, 255, 255, 0.05);
+    }
+
+    .map-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .map-board {
+        grid-template-columns: repeat(6, minmax(38px, 1fr));
     }
 }
