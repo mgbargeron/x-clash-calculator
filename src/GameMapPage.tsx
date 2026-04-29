@@ -71,11 +71,8 @@ function loadMap(config: GameMapConfig): MapTilesById {
 }
 
 const getCoordinate = (tile: GameMapTileConfig) => {
-  if (tile.width === 1 && tile.height === 1) {
-    return `${tile.x}, ${tile.y}`;
-  }
-
-  return `${tile.x}, ${tile.y} (${tile.width}x${tile.height})`;
+  const rowLabel = String.fromCharCode(64 + tile.y);
+  return `${rowLabel}${tile.x}`;
 };
 
 function MapBoard({
@@ -86,10 +83,14 @@ function MapBoard({
   onSelectTile,
   onPaintTile,
 }: MapBoardProps) {
+  const columnLabels = Array.from({ length: config.columns }, (_, index) => index + 1);
+  const rowLabels = Array.from({ length: config.rows }, (_, index) =>
+    String.fromCharCode(65 + index)
+  );
+
   return (
     <div
-      className="map-board"
-      aria-label="Editable game map"
+      className="map-board-frame"
       style={
         {
           "--map-columns": config.columns,
@@ -97,30 +98,43 @@ function MapBoard({
         } as CSSProperties
       }
     >
-      {config.tiles.map((tileConfig) => {
-        const tile = tiles[tileConfig.id] ?? { type: "empty", note: "" };
+      <div className="map-corner" aria-hidden="true" />
+      <div className="map-column-key" aria-hidden="true">
+        {columnLabels.map((column) => (
+          <span key={column}>{column}</span>
+        ))}
+      </div>
+      <div className="map-row-key" aria-hidden="true">
+        {rowLabels.map((row) => (
+          <span key={row}>{row}</span>
+        ))}
+      </div>
+      <div className="map-board" aria-label="Editable game map">
+        {config.tiles.map((tileConfig) => {
+          const tile = tiles[tileConfig.id] ?? { type: "empty", note: "" };
 
-        return (
-          <button
-            className={`map-tile ${tile.type} ${
-              selectedTileId === tileConfig.id ? "selected" : ""
-            }`}
-            type="button"
-            key={tileConfig.id}
-            onClick={() => onPaintTile(tileConfig.id, selectedType)}
-            onFocus={() => onSelectTile(tileConfig.id)}
-            aria-label={`Map tile ${getCoordinate(tileConfig)} ${tile.type}`}
-            title={tile.note || getCoordinate(tileConfig)}
-            style={{
-              gridColumn: `${tileConfig.x} / span ${tileConfig.width}`,
-              gridRow: `${tileConfig.y} / span ${tileConfig.height}`,
-            }}
-          >
-            <span className="tile-coordinate">{tileConfig.label ?? getCoordinate(tileConfig)}</span>
-            <span className="tile-marker">{tile.type === "empty" ? "" : tile.type[0]}</span>
-          </button>
-        );
-      })}
+          return (
+            <button
+              className={`map-tile ${tile.type} ${
+                selectedTileId === tileConfig.id ? "selected" : ""
+              }`}
+              type="button"
+              key={tileConfig.id}
+              onClick={() => onPaintTile(tileConfig.id, selectedType)}
+              onFocus={() => onSelectTile(tileConfig.id)}
+              aria-label={`Map tile ${getCoordinate(tileConfig)} ${tile.type}`}
+              title={tile.note || getCoordinate(tileConfig)}
+              style={{
+                gridColumn: `${tileConfig.x} / span ${tileConfig.width}`,
+                gridRow: `${tileConfig.y} / span ${tileConfig.height}`,
+              }}
+            >
+              <span className="tile-coordinate">{tileConfig.label ?? getCoordinate(tileConfig)}</span>
+              <span className="tile-marker">{tile.type === "empty" ? "" : tile.type[0]}</span>
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
