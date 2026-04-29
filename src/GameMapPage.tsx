@@ -133,7 +133,11 @@ function MapBoard({
                 <span className="town-level">
                   <span>{tileConfig.level}</span>
                 </span>
-              ) : null}
+              ) : (
+                <span className="frost-mine-level">
+                  <span>{tileConfig.level}</span>
+                </span>
+              )}
             </button>
           );
         })}
