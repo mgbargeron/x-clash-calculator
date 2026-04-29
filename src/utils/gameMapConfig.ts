@@ -18,26 +18,26 @@ export const defaultGameMapConfig: GameMapConfig = {
   rows: 20,
   tiles: [
     /** row 1 **/
-    { id: "r01-c01", x: 1, y: 1, width: 1, height: 1 },
+    { id: "r01-c01", x: 1, y: 1, width: 1, height: 1 }, // Level 1 Town
     { id: "r01-c02", x: 2, y: 1, width: 1, height: 1 },
     { id: "r01-c03", x: 3, y: 1, width: 1, height: 1 },
     { id: "r01-c04", x: 4, y: 1, width: 1, height: 1 },
-    { id: "r01-c05", x: 5, y: 1, width: 1, height: 1 },
+    { id: "r01-c05", x: 5, y: 1, width: 1, height: 1 }, // Level 1 Town
     { id: "r01-c06", x: 6, y: 1, width: 1, height: 1 },
-    { id: "r01-c07", x: 7, y: 1, width: 1, height: 1 },
+    { id: "r01-c07", x: 7, y: 1, width: 1, height: 1 }, // Level 1 Town
     { id: "r01-c08", x: 8, y: 1, width: 1, height: 1 },
     { id: "r01-c09", x: 9, y: 1, width: 1, height: 1 },
     { id: "r01-c10", x: 10, y: 1, width: 1, height: 1 },
-    { id: "r01-c11", x: 11, y: 1, width: 1, height: 1 },
+    { id: "r01-c11", x: 11, y: 1, width: 1, height: 1 }, // Level 1 Town
     { id: "r01-c12", x: 12, y: 1, width: 1, height: 1 },
     { id: "r01-c13", x: 13, y: 1, width: 1, height: 1 },
-    { id: "r01-c14", x: 14, y: 1, width: 1, height: 1 },
+    { id: "r01-c14", x: 14, y: 1, width: 1, height: 1 }, // Level 1 Town
     { id: "r01-c15", x: 15, y: 1, width: 1, height: 1 },
-    { id: "r01-c16", x: 16, y: 1, width: 1, height: 1 },
+    { id: "r01-c16", x: 16, y: 1, width: 1, height: 1 }, // Level 1 Town
     { id: "r01-c17", x: 17, y: 1, width: 1, height: 1 },
     { id: "r01-c18", x: 18, y: 1, width: 1, height: 1 },
     { id: "r01-c19", x: 19, y: 1, width: 1, height: 1 },
-    { id: "r01-c20", x: 20, y: 1, width: 1, height: 1 },
+    { id: "r01-c20", x: 20, y: 1, width: 1, height: 1 }, // Level 1 Town
 
     /** row 2 **/
     { id: "r02-c01", x: 1, y: 2, width: 1, height: 1 },
@@ -66,18 +66,18 @@ export const defaultGameMapConfig: GameMapConfig = {
     { id: "r03-c02", x: 2, y: 3, width: 1, height: 1 },
     { id: "r03-c03", x: 3, y: 3, width: 1, height: 1 },
     { id: "r03-c04", x: 4, y: 3, width: 1, height: 1 },
-    { id: "r03-c05", x: 5, y: 3, width: 1, height: 1 },
+    { id: "r03-c05", x: 5, y: 3, width: 1, height: 1 }, // Level 2 Town
     { id: "r03-c06", x: 6, y: 3, width: 1, height: 1 },
-    { id: "r03-c07", x: 7, y: 3, width: 1, height: 1 },
+    { id: "r03-c07", x: 7, y: 3, width: 1, height: 1 },  // Level 2 Town
     { id: "r03-c08", x: 8, y: 3, width: 1, height: 1 },
     { id: "r03-c09", x: 9, y: 3, width: 1, height: 1 },
     { id: "r03-c10", x: 10, y: 3, width: 1, height: 1 },
-    { id: "r03-c11", x: 11, y: 3, width: 1, height: 1 },
+    { id: "r03-c11", x: 11, y: 3, width: 1, height: 1 },  // Level 2 Town
     { id: "r03-c12", x: 12, y: 3, width: 1, height: 1 },
     { id: "r03-c13", x: 13, y: 3, width: 1, height: 1 },
-    { id: "r03-c14", x: 14, y: 3, width: 1, height: 1 },
+    { id: "r03-c14", x: 14, y: 3, width: 1, height: 1 },  // Level 2 Town
     { id: "r03-c15", x: 15, y: 3, width: 1, height: 1 },
-    { id: "r03-c16", x: 16, y: 3, width: 1, height: 1 },
+    { id: "r03-c16", x: 16, y: 3, width: 1, height: 1 },  // Level 2 Town
     { id: "r03-c17", x: 17, y: 3, width: 1, height: 1 },
     { id: "r03-c18", x: 18, y: 3, width: 1, height: 1 },
     { id: "r03-c19", x: 19, y: 3, width: 1, height: 1 },
@@ -91,26 +91,26 @@ export const defaultGameMapConfig: GameMapConfig = {
     { id: "r04-c05", x: 5, y: 4, width: 1, height: 1 },
     { id: "r04-c06", x: 6, y: 4, width: 1, height: 1 },
     { id: "r04-c07", x: 7, y: 4, width: 1, height: 1 },
-    { id: "r04-c08", x: 8, y: 4, width: 1, height: 1 },
+    { id: "r04-c08", x: 8, y: 4, width: 1, height: 1 },  // Level 3 Town
     { id: "r04-c09", x: 9, y: 4, width: 1, height: 1 },
-    { id: "r04-c10", x: 10, y: 4, width: 1, height: 1 },
+    { id: "r04-c10", x: 10, y: 4, width: 1, height: 1 }, // Level 3 Town
     { id: "r04-c11", x: 11, y: 4, width: 1, height: 1 },
     { id: "r04-c12", x: 12, y: 4, width: 1, height: 1 },
-    { id: "r04-c13", x: 13, y: 4, width: 1, height: 1 },
+    { id: "r04-c13", x: 13, y: 4, width: 1, height: 1 }, // Level 3 Town
     { id: "r04-c14", x: 14, y: 4, width: 1, height: 1 },
     { id: "r04-c15", x: 15, y: 4, width: 1, height: 1 },
     { id: "r04-c16", x: 16, y: 4, width: 1, height: 1 },
     { id: "r04-c17", x: 17, y: 4, width: 1, height: 1 },
-    { id: "r04-c18", x: 18, y: 4, width: 1, height: 1 },
+    { id: "r04-c18", x: 18, y: 4, width: 1, height: 1 }, // Level 2 Town
     { id: "r04-c19", x: 19, y: 4, width: 1, height: 1 },
-    { id: "r04-c20", x: 20, y: 4, width: 1, height: 1 },
+    { id: "r04-c20", x: 20, y: 4, width: 1, height: 1 }, // Level 1 Town
 
     /** row 5 **/
-    { id: "r05-c01", x: 1, y: 5, width: 1, height: 1 },
+    { id: "r05-c01", x: 1, y: 5, width: 1, height: 1 }, // Level 1 Town
     { id: "r05-c02", x: 2, y: 5, width: 1, height: 1 },
-    { id: "r05-c03", x: 3, y: 5, width: 1, height: 1 },
+    { id: "r05-c03", x: 3, y: 5, width: 1, height: 1 }, // Level 2 Town
     { id: "r05-c04", x: 4, y: 5, width: 1, height: 1 },
-    { id: "r05-c05", x: 5, y: 5, width: 1, height: 1 },
+    { id: "r05-c05", x: 5, y: 5, width: 1, height: 1 }, // Level 3 Town
     { id: "r05-c06", x: 6, y: 5, width: 1, height: 1 },
     { id: "r05-c07", x: 7, y: 5, width: 1, height: 1 },
     { id: "r05-c08", x: 8, y: 5, width: 1, height: 1 },
@@ -120,7 +120,7 @@ export const defaultGameMapConfig: GameMapConfig = {
     { id: "r05-c12", x: 12, y: 5, width: 1, height: 1 },
     { id: "r05-c13", x: 13, y: 5, width: 1, height: 1 },
     { id: "r05-c14", x: 14, y: 5, width: 1, height: 1 },
-    { id: "r05-c15", x: 15, y: 5, width: 1, height: 1 },
+    { id: "r05-c15", x: 15, y: 5, width: 1, height: 1 }, // Level 3 Town
     { id: "r05-c16", x: 16, y: 5, width: 1, height: 1 },
     { id: "r05-c17", x: 17, y: 5, width: 1, height: 1 },
     { id: "r05-c18", x: 18, y: 5, width: 1, height: 1 },
@@ -135,12 +135,12 @@ export const defaultGameMapConfig: GameMapConfig = {
     { id: "r06-c05", x: 5, y: 6, width: 1, height: 1 },
     { id: "r06-c06", x: 6, y: 6, width: 1, height: 1 },
     { id: "r06-c07", x: 7, y: 6, width: 1, height: 1 },
-    { id: "r06-c08", x: 8, y: 6, width: 1, height: 1 },
+    { id: "r06-c08", x: 8, y: 6, width: 1, height: 1 }, // Level 4 Town
     { id: "r06-c09", x: 9, y: 6, width: 1, height: 1 },
-    { id: "r06-c10", x: 10, y: 6, width: 1, height: 1 },
+    { id: "r06-c10", x: 10, y: 6, width: 1, height: 1 }, // Level 4 Town
     { id: "r06-c11", x: 11, y: 6, width: 1, height: 1 },
     { id: "r06-c12", x: 12, y: 6, width: 1, height: 1 },
-    { id: "r06-c13", x: 13, y: 6, width: 1, height: 1 },
+    { id: "r06-c13", x: 13, y: 6, width: 1, height: 1 },// Level 4 Town
     { id: "r06-c14", x: 14, y: 6, width: 1, height: 1 },
     { id: "r06-c15", x: 15, y: 6, width: 1, height: 1 },
     { id: "r06-c16", x: 16, y: 6, width: 1, height: 1 },
@@ -153,7 +153,7 @@ export const defaultGameMapConfig: GameMapConfig = {
     { id: "r07-c01", x: 1, y: 7, width: 1, height: 1 },
     { id: "r07-c02", x: 2, y: 7, width: 1, height: 1 },
     { id: "r07-c03", x: 3, y: 7, width: 1, height: 1 },
-    { id: "r07-c04", x: 4, y: 7, width: 1, height: 1 },
+    { id: "r07-c04", x: 4, y: 7, width: 1, height: 1 }, // Level 3 Town
     { id: "r07-c05", x: 5, y: 7, width: 1, height: 1 },
     { id: "r07-c06", x: 6, y: 7, width: 1, height: 1 },
     { id: "r07-c07", x: 7, y: 7, width: 1, height: 1 },
@@ -167,28 +167,27 @@ export const defaultGameMapConfig: GameMapConfig = {
     { id: "r07-c15", x: 15, y: 7, width: 1, height: 1 },
     { id: "r07-c16", x: 16, y: 7, width: 1, height: 1 },
     { id: "r07-c17", x: 17, y: 7, width: 1, height: 1 },
-    { id: "r07-c18", x: 18, y: 7, width: 1, height: 1 },
+    { id: "r07-c18", x: 18, y: 7, width: 1, height: 1 }, // Level 2 Town
     { id: "r07-c19", x: 19, y: 7, width: 1, height: 1 },
-    { id: "r07-c20", x: 20, y: 7, width: 1, height: 1 },
+    { id: "r07-c20", x: 20, y: 7, width: 1, height: 1 }, // Level 1 Town
 
     /** row 8 **/
-    { id: "r08-c01", x: 1, y: 8, width: 1, height: 1 },
+    { id: "r08-c01", x: 1, y: 8, width: 1, height: 1 }, // Level 1 Town
     { id: "r08-c02", x: 2, y: 8, width: 1, height: 1 },
-    { id: "r08-c03", x: 3, y: 8, width: 1, height: 1 },
+    { id: "r08-c03", x: 3, y: 8, width: 1, height: 1 }, // Level 2 Town
     { id: "r08-c04", x: 4, y: 8, width: 1, height: 1 },
     { id: "r08-c05", x: 5, y: 8, width: 1, height: 1 },
-    { id: "r08-c06", x: 6, y: 8, width: 1, height: 1 },
+    { id: "r08-c06", x: 6, y: 8, width: 1, height: 1 }, // Level 4 Town
     { id: "r08-c07", x: 7, y: 8, width: 1, height: 1 },
-    { id: "r08-c08", x: 8, y: 8, width: 2, height: 1 },
-
+    { id: "r08-c08", x: 8, y: 8, width: 2, height: 1 }, // Top Left Level 5 Town
     { id: "r08-c10", x: 10, y: 8, width: 1, height: 1 },
     { id: "r08-c11", x: 11, y: 8, width: 1, height: 1 },
     { id: "r08-c12", x: 12, y: 8, width: 1, height: 1 },
-    { id: "r08-c13", x: 13, y: 8, width: 1, height: 2 },
+    { id: "r08-c13", x: 13, y: 8, width: 1, height: 2 }, // Top Right Level 5 Town
     { id: "r08-c14", x: 14, y: 8, width: 1, height: 1 },
-    { id: "r08-c15", x: 15, y: 8, width: 1, height: 1 },
+    { id: "r08-c15", x: 15, y: 8, width: 1, height: 1 }, // Level 4 Town
     { id: "r08-c16", x: 16, y: 8, width: 1, height: 1 },
-    { id: "r08-c17", x: 17, y: 8, width: 1, height: 1 },
+    { id: "r08-c17", x: 17, y: 8, width: 1, height: 1 }, // Level 3 Town
     { id: "r08-c18", x: 18, y: 8, width: 1, height: 1 },
     { id: "r08-c19", x: 19, y: 8, width: 1, height: 1 },
     { id: "r08-c20", x: 20, y: 8, width: 1, height: 1 },
@@ -203,7 +202,7 @@ export const defaultGameMapConfig: GameMapConfig = {
     { id: "r09-c07", x: 7, y: 9, width: 1, height: 1 },
     { id: "r09-c08", x: 8, y: 9, width: 1, height: 1 },
     { id: "r09-c09", x: 9, y: 9, width: 1, height: 1 },
-    { id: "r09-c10", x: 10, y: 9, width: 2, height: 1 },
+    { id: "r09-c10", x: 10, y: 9, width: 2, height: 1 }, // Top Level 6 Town
     { id: "r09-c12", x: 12, y: 9, width: 1, height: 1 },
     { id: "r09-c14", x: 14, y: 9, width: 1, height: 1 },
     { id: "r09-c15", x: 15, y: 9, width: 1, height: 1 },
@@ -217,23 +216,22 @@ export const defaultGameMapConfig: GameMapConfig = {
     { id: "r10-c01", x: 1, y: 10, width: 1, height: 1 },
     { id: "r10-c02", x: 2, y: 10, width: 1, height: 1 },
     { id: "r10-c03", x: 3, y: 10, width: 1, height: 1 },
-    { id: "r10-c04", x: 4, y: 10, width: 1, height: 1 },
+    { id: "r10-c04", x: 4, y: 10, width: 1, height: 1 }, // Level 3 Town
     { id: "r10-c05", x: 5, y: 10, width: 1, height: 1 },
     { id: "r10-c06", x: 6, y: 10, width: 1, height: 1 },
     { id: "r10-c07", x: 7, y: 10, width: 1, height: 1 },
     { id: "r10-c08", x: 8, y: 10, width: 1, height: 1 },
-    { id: "r10-c09", x: 9, y: 10, width: 1, height: 2 }, // left level 6
+    { id: "r10-c09", x: 9, y: 10, width: 1, height: 2 }, // Left Level 6 Town
     { id: "r10-c10", x: 10, y: 10, width: 2, height: 2 },// royal city
-    // royal city
-    { id: "r10-c12", x: 12, y: 10, width: 1, height: 2 },
+    { id: "r10-c12", x: 12, y: 10, width: 1, height: 2 }, // Right Level 8 Town
     { id: "r10-c13", x: 13, y: 10, width: 1, height: 1 },
     { id: "r10-c14", x: 14, y: 10, width: 1, height: 1 },
-    { id: "r10-c15", x: 15, y: 10, width: 1, height: 1 },
+    { id: "r10-c15", x: 15, y: 10, width: 1, height: 1 }, // Level 4 Town
     { id: "r10-c16", x: 16, y: 10, width: 1, height: 1 },
     { id: "r10-c17", x: 17, y: 10, width: 1, height: 1 },
-    { id: "r10-c18", x: 18, y: 10, width: 1, height: 1 },
+    { id: "r10-c18", x: 18, y: 10, width: 1, height: 1 }, // Level 2 Town
     { id: "r10-c19", x: 19, y: 10, width: 1, height: 1 },
-    { id: "r10-c20", x: 20, y: 10, width: 1, height: 1 },
+    { id: "r10-c20", x: 20, y: 10, width: 1, height: 1 }, // Level 1 Town
 
     /** row 11 **/
     { id: "r11-c01", x: 1, y: 11, width: 1, height: 1 },
@@ -261,9 +259,9 @@ export const defaultGameMapConfig: GameMapConfig = {
     { id: "r12-c05", x: 5, y: 12, width: 1, height: 1 },
     { id: "r12-c06", x: 6, y: 12, width: 1, height: 1 },
     { id: "r12-c07", x: 7, y: 12, width: 1, height: 1 },
-    { id: "r12-c08", x: 8, y: 12, width: 1, height: 2 },
+    { id: "r12-c08", x: 8, y: 12, width: 1, height: 2 }, // Bottom Left Level 5 Town
     { id: "r12-c09", x: 9, y: 12, width: 1, height: 1 },
-    { id: "r12-c10", x: 10, y: 12, width: 2, height: 1 },
+    { id: "r12-c10", x: 10, y: 12, width: 2, height: 1 }, // Bottom Level 6 Town
     { id: "r12-c12", x: 12, y: 12, width: 1, height: 1 },
     { id: "r12-c13", x: 13, y: 12, width: 1, height: 1 },
     { id: "r12-c14", x: 14, y: 12, width: 1, height: 1 },
@@ -285,7 +283,7 @@ export const defaultGameMapConfig: GameMapConfig = {
     { id: "r13-c09", x: 9, y: 13, width: 1, height: 1 },
     { id: "r13-c10", x: 10, y: 13, width: 1, height: 1 },
     { id: "r13-c11", x: 11, y: 13, width: 1, height: 1 },
-    { id: "r13-c12", x: 12, y: 13, width: 2, height: 1 },
+    { id: "r13-c12", x: 12, y: 13, width: 2, height: 1 }, // Bottom Right Level 5 Town
     { id: "r13-c14", x: 14, y: 13, width: 1, height: 1 },
     { id: "r13-c15", x: 15, y: 13, width: 1, height: 1 },
     { id: "r13-c16", x: 16, y: 13, width: 1, height: 1 },
