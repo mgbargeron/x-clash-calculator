@@ -1,5 +1,33 @@
-const { app, BrowserWindow } = require('electron')
+const { app, BrowserWindow, ipcMain } = require('electron')
+const fs = require('fs/promises')
 const path = require('path')
+
+const mapDataPath = () => path.join(app.getPath('userData'), 'game-map-data.json')
+
+ipcMain.handle('map-storage:get', async () => {
+  try {
+    const raw = await fs.readFile(mapDataPath(), 'utf8')
+    return JSON.parse(raw)
+  } catch (error) {
+    if (error.code === 'ENOENT') {
+      return null
+    }
+
+    console.error('Failed to read map data', error)
+    return null
+  }
+})
+
+ipcMain.handle('map-storage:set', async (_event, data) => {
+  try {
+    await fs.mkdir(path.dirname(mapDataPath()), { recursive: true })
+    await fs.writeFile(mapDataPath(), JSON.stringify(data, null, 2), 'utf8')
+    return { ok: true }
+  } catch (error) {
+    console.error('Failed to save map data', error)
+    return { ok: false, error: error.message }
+  }
+})
 
 function createWindow() {
   const win = new BrowserWindow({

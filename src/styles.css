@@ -42,6 +42,8 @@
     font-family: Inter, system-ui, Arial, sans-serif;
     color: #f5f7ff;
     background: #0f1220;
+    --score-color: #9db1ff;
+    --rival-color: #d8aa32;
 }
 
 * {
@@ -82,7 +84,8 @@ body {
 
 .nav-button,
 .secondary-button,
-.tool-button {
+.tool-button,
+.icon-tool-button {
     border: 1px solid rgba(255, 255, 255, 0.14);
     color: #f5f7ff;
     background: rgba(255, 255, 255, 0.08);
@@ -98,7 +101,8 @@ body {
 }
 
 .nav-button.active,
-.tool-button.active {
+.tool-button.active,
+.icon-tool-button.active {
     border-color: #9db1ff;
     background: #33447a;
 }
@@ -170,7 +174,15 @@ h1 {
 }
 
 .map-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 280px;
+    gap: 14px;
+    align-items: start;
     width: 100%;
+    min-width: 0;
+}
+
+.map-board-column {
     min-width: 0;
 }
 
@@ -199,6 +211,77 @@ h1 {
     aspect-ratio: calc((var(--map-columns) * var(--tile-width-ratio)) + 1) / calc(var(--map-rows) + 1);
     min-width: 0;
     margin: 0 auto;
+}
+
+.map-score-panel {
+    display: grid;
+    gap: 8px;
+    min-width: 0;
+}
+
+.score-row {
+    display: grid;
+    grid-template-columns: 10px minmax(0, 1fr);
+    gap: 8px;
+    align-items: center;
+    padding: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-left: 4px solid var(--score-color, #9db1ff);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.07);
+}
+
+.score-color {
+    width: 10px;
+    height: 10px;
+    border-radius: 999px;
+    background: var(--score-color, #9db1ff);
+}
+
+.score-row strong,
+.score-row input {
+    min-width: 0;
+    color: #f5f7ff;
+    font: inherit;
+    font-weight: 800;
+}
+
+.score-row input {
+    width: 100%;
+    min-height: 28px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 6px;
+    background: rgba(10, 14, 28, 0.42);
+    padding: 4px 6px;
+    outline: none;
+}
+
+.score-row input:focus {
+    border-color: #9db1ff;
+}
+
+.points-cells {
+    grid-column: 2;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 4px;
+}
+
+.points-cells span,
+.points-cells small {
+    display: grid;
+    place-items: center;
+    min-height: 24px;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.08);
+    color: #d9def7;
+    font-size: 0.75rem;
+    font-weight: 900;
+    line-height: 1;
+}
+
+.points-cells span {
+    color: #ffffff;
 }
 
 .map-corner {
@@ -270,19 +353,15 @@ h1 {
 }
 
 .map-tile.base {
-    background: #24524b;
+    box-shadow: inset 0 0 0 3px #45b66b;
 }
 
-.map-tile.rally {
-    background: #315186;
+.map-tile.enemy {
+    box-shadow: inset 0 0 0 3px #cf3f45;
 }
 
-.map-tile.farm {
-    background: #5b6130;
-}
-
-.map-tile.threat {
-    background: #6a2f3b;
+.map-tile.rival {
+    box-shadow: inset 0 0 0 3px var(--rival-color, #d8aa32);
 }
 
 .map-tile.town {
@@ -351,6 +430,52 @@ h1 {
     width: 100%;
 }
 
+.icon-tool-button {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 38px;
+    height: 38px;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    line-height: 1;
+}
+
+.tool-count {
+    position: absolute;
+    right: -6px;
+    top: -6px;
+    display: grid;
+    place-items: center;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 4px;
+    border-radius: 999px;
+    background: #f4f6ff;
+    color: #10131d;
+    font-size: 0.68rem;
+    font-weight: 900;
+    line-height: 1;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.28);
+}
+
+.icon-tool-button.base {
+    background: #245c38;
+}
+
+.icon-tool-button.enemy {
+    background: #7c252b;
+}
+
+.icon-tool-button.rival {
+    background: var(--rival-color, #d8aa32);
+    color: #10131d;
+}
+
+.icon-tool-button.none {
+    background: rgba(255, 255, 255, 0.08);
+}
+
 .tool-button {
     flex: 1 1 110px;
     min-height: 36px;
@@ -386,7 +511,7 @@ h1 {
 
 .map-details {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(260px, 420px);
+    grid-template-columns: minmax(260px, 420px);
     gap: 18px;
     align-items: start;
 }
@@ -394,6 +519,7 @@ h1 {
 .summary-row {
     display: flex;
     justify-content: space-between;
+    align-items: center;
     gap: 12px;
     min-width: 150px;
     flex: 1 1 150px;
@@ -401,6 +527,19 @@ h1 {
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 8px;
     background: rgba(255, 255, 255, 0.07);
+}
+
+.points-summary-row {
+    display: grid;
+    grid-template-columns: minmax(72px, 1fr) auto auto auto;
+    gap: 10px;
+}
+
+.points-summary-row small {
+    color: #d9def7;
+    font-size: 0.78rem;
+    font-weight: 800;
+    white-space: nowrap;
 }
 
 .note-field {
@@ -555,6 +694,10 @@ h1 {
     }
 
     .map-details {
+        grid-template-columns: 1fr;
+    }
+
+    .map-layout {
         grid-template-columns: 1fr;
     }
 }
