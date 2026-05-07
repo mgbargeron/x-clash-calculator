@@ -239,7 +239,20 @@ function MapBoard({
           <span key={row}>{row}</span>
         ))}
       </div>
-      <div className="map-board" aria-label="Editable game map">
+      <div 
+        className="map-board" 
+        aria-label="Editable game map"
+        onBlur={(e) => {
+          // Clear the selected tile when focus is lost from the map board
+          if (e.currentTarget.contains(e.relatedTarget)) {
+            // If focus moves to a child element, don't clear selection
+            return;
+          }
+          // Clear the selection if focus is lost to a different element
+          onSelectTile("");
+        }}
+        tabIndex={-1}
+      >
         {config.tiles.map((tileConfig) => {
           const tile =
             tiles[tileConfig.id] ?? { marker: "none", rivalColor: initialRivalColors[0], note: "" };
