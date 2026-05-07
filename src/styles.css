@@ -238,6 +238,23 @@ h1 {
     background: var(--score-color, #9db1ff);
 }
 
+.score-row.rival {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.score-row.rival .score-color {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--score-color);
+}
+
 .score-row strong,
 .score-row input {
     min-width: 0;
@@ -474,6 +491,86 @@ h1 {
 
 .icon-tool-button.none {
     background: rgba(255, 255, 255, 0.08);
+}
+
+.add-rival-button {
+    display: grid;
+    place-items: center;
+    width: 38px;
+    height: 38px;
+    border-radius: 8px;
+    font-size: 1.5rem;
+    font-weight: 700;
+    background: rgba(255, 255, 255, 0.08);
+    color: #f5f7ff;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.add-rival-button:hover {
+    background: rgba(255, 255, 255, 0.14);
+    border-color: #9db1ff;
+}
+
+.rival-tool-container {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  position: relative;
+}
+
+.rival-input-container {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 120px;
+}
+
+.rival-color-picker {
+  width: 100%;
+  height: 24px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  padding: 0;
+}
+
+.rival-color-picker::-webkit-color-swatch {
+  border-radius: 4px;
+  border: none;
+}
+
+.rival-color-picker::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.remove-rival-button {
+    position: absolute;
+    font-size: 1.2rem;
+    background: #cf3f45;
+    color: white;
+    bottom: -6px;
+    right: -6px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+    font-weight: bold;
+}
+
+.remove-rival-button:hover {
+    background: #a72d33;
+}
+
+.remove-rival-button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
 }
 
 .tool-button {

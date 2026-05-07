@@ -1,0 +1,23 @@
+  aria-label={`Rival ${index + 1} name`}
+                value={rivalNames[color] ?? `Rival ${index + 1}`}
+                onChange={(event) => updateRivalName(color, event.target.value)}
+              />
+              {renderPointSummary(rivalPointSummary[color])}
+            </div>
+          ))}
+        </aside>
+      </div>
+
+      <div className="map-details">
+        <label className="note-field">
+          <span>Tile {selectedTileLabel}</span>
+          <textarea
+            value={selectedTile.note}
+            onChange={(event) => updateSelectedNote(event.target.value)}
+            placeholder="Add target, timer, or player note"
+          />
+        </label>
+      </div>
+    </section>
+  );
+}

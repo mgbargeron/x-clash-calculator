@@ -19,3 +19,4 @@ yarn-error.log*
 /.idea/workspace.xml
 /.idea/x-clash-calculator.iml
 /.idea/
+/opencode.json
