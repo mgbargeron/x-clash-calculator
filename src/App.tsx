@@ -1,8 +1,10 @@
 import CalculationTable from "./CalculationTable";
 import {useEffect, useState} from "react";
+import type {ReactNode} from "react";
 import {sanitizeNumericInput} from "./utils/sanatizeNumericInput";
 import {formatInputValue} from "./utils/formatInputValue";
 import GameMapPage from "./GameMapPage";
+import HeroExpCalculator from "./HeroExpCalculator";
 
 export type Row = {
   description: string;
@@ -52,12 +54,6 @@ const getInitialGoldRows = (values: string[]): Row[] => [
   {description: "Legendary Selection Chest", value: values[2] ?? "", quantity: "", isStatic: true},
 ];
 
-const getInitialHeroExpRows = (values: string[]): Row[] => [
-  {description: "Blue Chest", value: values[0] ?? "", quantity: "", isStatic: true},
-  {description: "Purple Chest", value: values[1] ?? "", quantity: "", isStatic: true},
-  {description: "Legendary Chest", value: values[2] ?? "", quantity: "", isStatic: true},
-];
-
 const columnHeaders = ["Blue Chest", "Purple Chest", "Legendary Chest"];
 const calculatorRowHeaders = ["Resources", "Gold"];
 type Page = "calculator" | "heroExp" | "map";
@@ -89,20 +85,26 @@ function loadInitialGridValues(): string[][] {
 type CalculatorPageProps = {
   gridValues: string[][];
   updateGridCell: (rowIndex: number, columnIndex: number, value: string) => void;
+  navigation: ReactNode;
 };
 
-function CalculatorPage({gridValues, updateGridCell}: CalculatorPageProps) {
+function CalculatorPage({gridValues, updateGridCell, navigation}: CalculatorPageProps) {
   const initialWheatRows: Row[] = getInitialResourceRows(gridValues[0]);
   const initialIronRows: Row[] = getInitialResourceRows(gridValues[0]);
   const initialGoldRows: Row[] = getInitialGoldRows(gridValues[1]);
 
   return (
     <section className="card calculator">
-      <p className="eyebrow">Auto total calculator</p>
-      <h1>Chest Value × Quantity</h1>
-      <p className="description">
-        Enter a value and quantity for each row. Totals update automatically.
-      </p>
+      <div className="page-title-row">
+        <div>
+          <p className="eyebrow">Auto total calculator</p>
+          <h1>Chest Value × Quantity</h1>
+          <p className="description">
+            Enter a value and quantity for each row. Totals update automatically.
+          </p>
+        </div>
+        {navigation}
+      </div>
 
       <div className="tables-container">
         <div className="table">
@@ -164,55 +166,29 @@ function CalculatorPage({gridValues, updateGridCell}: CalculatorPageProps) {
 type HeroExpPageProps = {
   gridValues: string[][];
   updateGridCell: (rowIndex: number, columnIndex: number, value: string) => void;
+  navigation: ReactNode;
 };
 
-function HeroExpPage({gridValues, updateGridCell}: HeroExpPageProps) {
-  const initialHeroExpRows: Row[] = getInitialHeroExpRows(gridValues[2]);
-
+function HeroExpPage({gridValues, updateGridCell, navigation}: HeroExpPageProps) {
   return (
     <section className="card calculator">
-      <p className="eyebrow">Hero progression</p>
-      <h1>Hero Exp Calculator</h1>
-      <p className="description">
-        Set hero exp chest values, then enter quantities to total your available exp.
-      </p>
+      <div className="page-title-row">
+        <div>
+          <p className="eyebrow">Hero progression</p>
+          <h1>Hero Exp Calculator</h1>
+          <p className="description">
+            Set hero exp chest values, then enter quantities to total your available exp.
+          </p>
+        </div>
+        {navigation}
+      </div>
 
       <div className="tables-container">
-        <div className="table">
-          <div className="table-header"></div>
-          {columnHeaders.map((header) => (
-            <div className="table-header" key={header}>
-              {header}
-            </div>
-          ))}
-
-          <div className="table-row">
-            <div className="cell-display">Hero exp</div>
-            {columnHeaders.map((_, columnIndex) => (
-              <input
-                key={`hero-exp-${columnIndex}`}
-                className="cell-input"
-                type="text"
-                inputMode="decimal"
-                placeholder="0"
-                value={formatInputValue(gridValues[2][columnIndex])}
-                onChange={(event) =>
-                  updateGridCell(2, columnIndex, event.target.value)
-                }
-              />
-            ))}
-          </div>
-        </div>
-
-        <div className="tables-container">
-          <div className="calculator-wrapper">
-            <CalculationTable
-              initialRows={initialHeroExpRows}
-              resourceName="Hero Exp"
-              storageKey={HERO_EXP_STORAGE_KEY}
-            />
-          </div>
-        </div>
+        <HeroExpCalculator
+          chestValues={gridValues[2]}
+          onChestValueChange={(columnIndex, value) => updateGridCell(2, columnIndex, value)}
+          storageKey={HERO_EXP_STORAGE_KEY}
+        />
       </div>
     </section>
   );
@@ -237,37 +213,48 @@ export default function App() {
     );
   };
 
+  const navigation = (
+    <nav className="app-nav" aria-label="Primary navigation">
+      <button
+        className={`nav-button ${page === "calculator" ? "active" : ""}`}
+        type="button"
+        onClick={() => setPage("calculator")}
+      >
+        Calculator
+      </button>
+      <button
+        className={`nav-button ${page === "heroExp" ? "active" : ""}`}
+        type="button"
+        onClick={() => setPage("heroExp")}
+      >
+        Hero Exp
+      </button>
+      <button
+        className={`nav-button ${page === "map" ? "active" : ""}`}
+        type="button"
+        onClick={() => setPage("map")}
+      >
+        Game Map
+      </button>
+    </nav>
+  );
+
   return (
     <main className="app">
-      <nav className="app-nav" aria-label="Primary navigation">
-        <button
-          className={`nav-button ${page === "calculator" ? "active" : ""}`}
-          type="button"
-          onClick={() => setPage("calculator")}
-        >
-          Calculator
-        </button>
-        <button
-          className={`nav-button ${page === "heroExp" ? "active" : ""}`}
-          type="button"
-          onClick={() => setPage("heroExp")}
-        >
-          Hero Exp
-        </button>
-        <button
-          className={`nav-button ${page === "map" ? "active" : ""}`}
-          type="button"
-          onClick={() => setPage("map")}
-        >
-          Game Map
-        </button>
-      </nav>
       {page === "calculator" ? (
-        <CalculatorPage gridValues={gridValues} updateGridCell={updateGridCell} />
+        <CalculatorPage
+          gridValues={gridValues}
+          updateGridCell={updateGridCell}
+          navigation={navigation}
+        />
       ) : page === "heroExp" ? (
-        <HeroExpPage gridValues={gridValues} updateGridCell={updateGridCell} />
+        <HeroExpPage
+          gridValues={gridValues}
+          updateGridCell={updateGridCell}
+          navigation={navigation}
+        />
       ) : (
-        <GameMapPage />
+        <GameMapPage navigation={navigation} />
       )}
     </main>
   );

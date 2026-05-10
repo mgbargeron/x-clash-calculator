@@ -139,6 +139,13 @@ body {
     align-items: center;
     justify-content: space-between;
     gap: 18px;
+    flex-wrap: wrap;
+}
+
+.page-title-row > div {
+    display: grid;
+    gap: 8px;
+    min-width: 0;
 }
 
 .calculator-wrapper {
@@ -938,6 +945,358 @@ h1 {
     font-size: 0.95rem;
 }
 
+.hero-exp-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1.3fr) minmax(320px, 0.7fr);
+    gap: 18px;
+    width: min(1260px, 100%);
+    align-items: start;
+}
+
+.hero-exp-main,
+.hero-exp-sidebar,
+.hero-exp-summary-list {
+    display: grid;
+    gap: 16px;
+}
+
+.hero-exp-sidebar {
+    position: sticky;
+    top: 16px;
+}
+
+.hero-surface {
+    display: grid;
+    gap: 16px;
+    padding: 18px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 14px;
+    background: rgba(7, 10, 20, 0.42);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.hero-exp-overview-top,
+.hero-exp-kpi-strip,
+.hero-exp-progress-grid,
+.hero-exp-input-grid,
+.hero-exp-summary-grid {
+    display: grid;
+    gap: 12px;
+}
+
+.hero-exp-overview-top {
+    grid-template-columns: 180px minmax(0, 1fr);
+    align-items: end;
+}
+
+.hero-exp-kpi-strip {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.hero-exp-kpi,
+.hero-exp-stat-card {
+    display: grid;
+    gap: 6px;
+    min-height: 92px;
+    padding: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.hero-exp-kpi span,
+.hero-exp-stat-card span,
+.hero-section-label,
+.hero-exp-input-card-head p,
+.hero-progress-heading span,
+.hero-exp-field span {
+    margin: 0;
+    color: #b9c7ff;
+    font-size: 0.78rem;
+    font-weight: 800;
+    text-transform: uppercase;
+}
+
+.hero-exp-kpi strong,
+.hero-exp-stat-card strong {
+    color: #ffffff;
+    font-size: 1.35rem;
+    line-height: 1.1;
+}
+
+.hero-exp-control {
+    display: grid;
+    gap: 8px;
+    color: #d9def7;
+    font-weight: 700;
+}
+
+.hero-level-select {
+    min-height: 44px;
+    min-width: 132px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 8px;
+    background: rgba(10, 14, 28, 0.7);
+    color: #ffffff;
+    padding: 0 12px;
+    font: inherit;
+    outline: none;
+}
+
+.hero-level-select:focus {
+    border-color: #6d8cff;
+    box-shadow: 0 0 0 3px rgba(109, 140, 255, 0.2);
+}
+
+.hero-exp-progress-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.hero-progress-card {
+    display: grid;
+    gap: 10px;
+    padding: 14px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.hero-progress-heading {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.hero-progress-heading strong {
+    color: #ffffff;
+    font-size: 1rem;
+}
+
+.hero-progress-track {
+    position: relative;
+    overflow: hidden;
+    height: 12px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.hero-progress-fill {
+    height: 100%;
+    border-radius: inherit;
+}
+
+.hero-progress-fill-next {
+    background: linear-gradient(90deg, #6d8cff 0%, #8cc6ff 100%);
+}
+
+.hero-progress-fill-max {
+    background: linear-gradient(90deg, #d8aa32 0%, #f4d97d 100%);
+}
+
+.hero-progress-card small {
+    color: #d9def7;
+    font-size: 0.88rem;
+}
+
+.hero-section-heading {
+    display: flex;
+    align-items: end;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.hero-section-heading-tight {
+    margin-bottom: 2px;
+}
+
+.hero-section-heading h2 {
+    margin: 4px 0 0;
+    font-size: 1.1rem;
+}
+
+.hero-exp-input-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.hero-exp-input-card {
+    display: grid;
+    gap: 14px;
+    padding: 16px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.hero-exp-input-card-head {
+    display: flex;
+    align-items: start;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.hero-exp-input-card-head strong,
+.hero-exp-input-card-head output {
+    color: #ffffff;
+    font-size: 1rem;
+    font-weight: 800;
+}
+
+.hero-exp-input-card-head output {
+    white-space: nowrap;
+    color: #9db1ff;
+}
+
+.hero-exp-field {
+    display: grid;
+    gap: 8px;
+}
+
+.hero-exp-chest-grid,
+.hero-exp-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap: 12px;
+}
+
+.hero-exp-chest-card {
+    display: grid;
+    gap: 8px;
+    padding: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.hero-exp-chest-card strong,
+.hero-exp-stat-card strong {
+    color: #ffffff;
+    font-size: 1.1rem;
+}
+
+.hero-exp-chest-card p {
+    margin: 0;
+    color: #b9c7ff;
+    font-size: 0.82rem;
+    font-weight: 800;
+    text-transform: uppercase;
+}
+
+.hero-exp-chest-card span {
+    color: #d9def7;
+    font-size: 0.92rem;
+}
+
+.hero-exp-sidebar-panel {
+    gap: 14px;
+}
+
+.hero-level-list {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+    max-height: 520px;
+    overflow: auto;
+    padding-right: 4px;
+}
+
+.hero-level-legend {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    color: #d9def7;
+    font-size: 0.82rem;
+    font-weight: 700;
+}
+
+.hero-level-legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+}
+
+.hero-level-legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 999px;
+    flex: 0 0 auto;
+}
+
+.hero-level-legend-dot-current {
+    background: #d8aa32;
+    box-shadow: 0 0 0 1px rgba(216, 170, 50, 0.35);
+}
+
+.hero-level-legend-dot-next {
+    background: #8cc6ff;
+    box-shadow: 0 0 0 1px rgba(140, 198, 255, 0.35);
+}
+
+.hero-level-pill {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 12px;
+    min-height: 46px;
+    padding: 10px 12px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.05);
+    color: #f5f7ff;
+    font-weight: 800;
+    text-align: left;
+}
+
+.hero-level-label,
+.hero-level-exp {
+    min-width: 0;
+}
+
+.hero-level-label {
+    color: inherit;
+}
+
+.hero-level-exp {
+    color: #d9def7;
+    font-size: 0.92rem;
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+.hero-level-achieved {
+    background: rgba(255, 255, 255, 0.03);
+    color: rgba(245, 247, 255, 0.42);
+    border-color: rgba(255, 255, 255, 0.08);
+}
+
+.hero-level-current {
+    border-color: rgba(216, 170, 50, 0.9);
+    background: rgba(216, 170, 50, 0.12);
+    box-shadow: 0 0 18px rgba(216, 170, 50, 0.28);
+    text-shadow: 0 0 18px rgba(255, 231, 165, 0.45);
+    color: #ffe7a5;
+}
+
+.hero-level-next {
+    border-color: rgba(109, 140, 255, 0.9);
+    background: rgba(109, 140, 255, 0.16);
+    color: #f5f7ff;
+}
+
+.hero-level-current .hero-level-exp {
+    color: #ffe7a5;
+}
+
+.hero-level-next .hero-level-exp {
+    color: #dbe5ff;
+}
+
+.hero-level-pending {
+    color: #d9def7;
+}
+
 @media (max-width: 640px) {
     .app {
         padding: 16px;
@@ -985,5 +1344,24 @@ h1 {
 
     .map-layout {
         grid-template-columns: 1fr;
+    }
+
+    .hero-exp-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .hero-exp-sidebar {
+        position: static;
+    }
+
+    .hero-exp-overview-top,
+    .hero-exp-kpi-strip,
+    .hero-exp-progress-grid,
+    .hero-exp-input-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .hero-level-list {
+        max-height: none;
     }
 }

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import {
   defaultGameMapConfig,
 } from "./utils/gameMapConfig";
@@ -173,6 +173,10 @@ type GameMapSnapshot = {
 };
 
 const MAX_ACTION_HISTORY = 10;
+
+type GameMapPageProps = {
+  navigation: ReactNode;
+};
 
 type MapBoardProps = {
   config: GameMapConfig;
@@ -496,7 +500,7 @@ function MapBoard({
   );
 }
 
-export default function GameMapPage() {
+export default function GameMapPage({ navigation }: GameMapPageProps) {
   const mapConfig = defaultGameMapConfig;
   const firstTileId = mapConfig.tiles[0]?.id ?? "";
   const boardRef = useRef<HTMLDivElement | null>(null);
@@ -1004,6 +1008,7 @@ export default function GameMapPage() {
           <p className="eyebrow">Planning board</p>
           <h1>Game Map</h1>
         </div>
+        {navigation}
       </div>
 
       <div className="map-toolbar" aria-label="Map tile tools">
