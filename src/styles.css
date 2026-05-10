@@ -222,7 +222,7 @@ h1 {
 
 .score-row {
     display: grid;
-    grid-template-columns: 10px minmax(0, 1fr);
+    grid-template-columns: 10px minmax(0, 1fr) auto;
     gap: 8px;
     align-items: center;
     padding: 8px;
@@ -237,6 +237,67 @@ h1 {
     height: 10px;
     border-radius: 999px;
     background: var(--score-color, #9db1ff);
+}
+
+/* Score group labels with add buttons */
+.score-group-label {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 4px 8px;
+    font-size: 0.75rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #9db1ff;
+}
+
+.aside-add-button {
+    display: grid;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    font-size: 1.2rem;
+    font-weight: 700;
+    background: rgba(157, 177, 255, 0.15);
+    color: #9db1ff;
+    border: 1px solid rgba(157, 177, 255, 0.3);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    line-height: 1;
+}
+
+.aside-add-button:hover {
+    background: rgba(157, 177, 255, 0.25);
+    border-color: #9db1ff;
+}
+
+.remove-team-button {
+    position: static;
+    display: grid;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    font-size: 1.1rem;
+    background: rgba(207, 63, 69, 0.15);
+    color: #cf3f45;
+    border: 1px solid rgba(207, 63, 69, 0.3);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    line-height: 1;
+}
+
+.remove-team-button:hover {
+    background: rgba(207, 63, 69, 0.3);
+    border-color: #cf3f45;
+}
+
+.remove-team-button:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
 }
 
 .score-row strong,

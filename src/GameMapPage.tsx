@@ -27,7 +27,7 @@ type RivalTeam = {
 };
 
 type EnemyTeam = {
-  color: string;
+  id: string;
   name: string;
   code: string;
 };
@@ -37,6 +37,7 @@ type StoredMapData = {
   rivalTeams?: unknown;
   enemyTeams?: unknown;
   ourTeam?: unknown;
+  updatedAt?: unknown;
 };
 
 type StoredOurTeam = {
@@ -52,7 +53,8 @@ type StoredRivalTeam = {
 };
 
 type StoredEnemyTeam = {
-  color: string;
+  id?: string;
+  color?: string;
   name: string;
   code: string;
 };
@@ -62,7 +64,6 @@ const MAP_STORAGE_KEY = "game-map-v1";
 const markerTools: Array<{ marker: Exclude<TileMarker, "rival">; label: string; icon: string }> = [
   { marker: "none", label: "Clear marker", icon: "C" },
   { marker: "base", label: "Our base", icon: "B" },
-  { marker: "enemy", label: "Enemy", icon: "E" },
 ];
 
 // Initialize with default colors but allow for dynamic addition
@@ -90,24 +91,21 @@ const defaultRivalNames = initialRivalColors.reduce<Record<string, string>>(
   {}
 );
 
-const initialEnemyColors = [
-  "#cf3f45",
-  "#e07020",
-  "#8b5e3c",
-];
+const ENEMY_COLOR = "#CF3F45";
+const initialEnemyIds = ["enemy-1", "enemy-2", "enemy-3"];
 
-const defaultEnemyCodes = initialEnemyColors.reduce<Record<string, string>>(
-  (codes, color, index) => ({
+const defaultEnemyCodes = initialEnemyIds.reduce<Record<string, string>>(
+  (codes, id, index) => ({
     ...codes,
-    [color]: ["RED", "ORG", "BRN"][index] || `E${index + 1}`,
+    [id]: `E${index + 1}`,
   }),
   {}
 );
 
-const defaultEnemyNames = initialEnemyColors.reduce<Record<string, string>>(
-  (names, color, index) => ({
+const defaultEnemyNames = initialEnemyIds.reduce<Record<string, string>>(
+  (names, id, index) => ({
     ...names,
-    [color]: `Enemy ${index + 1}`,
+    [id]: `Enemy ${index + 1}`,
   }),
   {}
 );
@@ -135,16 +133,16 @@ type MapBoardProps = {
   selectedTileId: string;
   selectedMarker: TileMarker;
   selectedRivalColor: string;
-  selectedEnemyColor: string;
+  selectedEnemyTeamId: string;
   onSelectTile: (tileId: string) => void;
-  onPaintTile: (tileId: string, marker: TileMarker, rivalColor: string, enemyColor?: string) => void;
+  onPaintTile: (tileId: string, marker: TileMarker, rivalColor: string, enemyTeamId?: string) => void;
 };
 
 const createEmptyMap = (config: GameMapConfig): MapTilesById =>
   config.tiles.reduce<MapTilesById>(
     (tiles, tile) => ({
       ...tiles,
-      [tile.id]: { marker: "none", rivalColor: initialRivalColors[0], enemyColor: initialEnemyColors[0], note: "" },
+      [tile.id]: { marker: "none", rivalColor: initialRivalColors[0], enemyColor: initialEnemyIds[0], note: "" },
     }),
     {}
   );
@@ -178,7 +176,7 @@ function normalizeMap(config: GameMapConfig, parsed: unknown): MapTilesById {
     const enemyColor =
       typeof savedTile?.enemyColor === "string" && savedTile.enemyColor
         ? savedTile.enemyColor
-        : initialEnemyColors[0];
+        : initialEnemyIds[0];
 
     return {
       ...tiles,
@@ -207,25 +205,12 @@ function normalizeRivalTeams(parsed: unknown): RivalTeam[] {
   }
 
   const storedTeams = maybeTeams as StoredRivalTeam[];
-  
-  const existingColors = new Set(storedTeams.map(t => t.color));
-  const result: RivalTeam[] = storedTeams.map(team => ({
+
+  return storedTeams.map(team => ({
     color: team.color,
     name: typeof team.name === "string" && team.name ? team.name : `Rival`,
     code: typeof team.code === "string" && team.code ? team.code.substring(0, 3).toUpperCase() : `R`,
   }));
-
-  for (const color of initialRivalColors) {
-    if (!existingColors.has(color)) {
-      result.push({
-        color,
-        name: defaultRivalNames[color] || "Rival",
-        code: defaultRivalCodes[color] || "R1",
-      });
-    }
-  }
-
-  return result;
 }
 
 function normalizeOurTeam(parsed: unknown): OurTeamConfig {
@@ -257,76 +242,73 @@ function normalizeEnemyTeams(parsed: unknown): EnemyTeam[] {
       : null;
 
   if (!maybeTeams || !Array.isArray(maybeTeams)) {
-    return initialEnemyColors.map((color, index) => ({
-      color,
-      name: defaultEnemyNames[color] || `Enemy ${index + 1}`,
-      code: defaultEnemyCodes[color] || `E${index + 1}`,
+    return initialEnemyIds.map((id, index) => ({
+      id,
+      name: defaultEnemyNames[id] || `Enemy ${index + 1}`,
+      code: defaultEnemyCodes[id] || `E${index + 1}`,
     }));
   }
 
   const storedTeams = maybeTeams as StoredEnemyTeam[];
-  
-  const existingColors = new Set(storedTeams.map(t => t.color));
-  const result: EnemyTeam[] = storedTeams.map(team => ({
-    color: team.color,
+
+  return storedTeams.map(team => ({
+    id:
+      typeof team.id === "string" && team.id
+        ? team.id
+        : typeof team.color === "string" && team.color
+          ? team.color
+          : `enemy-${Math.random().toString(36).slice(2, 10)}`,
     name: typeof team.name === "string" && team.name ? team.name : `Enemy`,
     code: typeof team.code === "string" && team.code ? team.code.substring(0, 3).toUpperCase() : "XXX",
   }));
-
-  for (const color of initialEnemyColors) {
-    if (!existingColors.has(color)) {
-      result.push({
-        color,
-        name: defaultEnemyNames[color] || "Enemy",
-        code: defaultEnemyCodes[color] || "E1",
-      });
-    }
-  }
-
-  return result;
 }
 
 async function loadStoredMap(
   config: GameMapConfig
 ): Promise<{ tiles: MapTilesById; rivalTeams: RivalTeam[]; ourTeam: OurTeamConfig; enemyTeams: EnemyTeam[] }> {
-  let parsed: unknown = null;
+  const emptyState = {
+    tiles: createEmptyMap(config),
+    rivalTeams: normalizeRivalTeams(null),
+    ourTeam: normalizeOurTeam(null),
+    enemyTeams: normalizeEnemyTeams(null),
+  };
 
+  const getUpdatedAt = (data: unknown): number =>
+    data &&
+    typeof data === "object" &&
+    !Array.isArray(data) &&
+    typeof (data as StoredMapData).updatedAt === "number"
+      ? ((data as StoredMapData).updatedAt as number)
+      : 0;
+
+  let electronData: unknown = null;
   if (window.electronAPI?.getMapData) {
-    parsed = await window.electronAPI.getMapData();
-    return {
-      tiles: normalizeMap(config, parsed),
-      rivalTeams: normalizeRivalTeams(parsed),
-      ourTeam: normalizeOurTeam(parsed),
-      enemyTeams: normalizeEnemyTeams(parsed),
-    };
+    try {
+      electronData = await window.electronAPI.getMapData();
+    } catch (ipcError) {
+      console.error("[GameMapPage] Electron IPC get failed, falling back to localStorage:", ipcError);
+    }
   }
 
+  let localStorageData: unknown = null;
   try {
     const raw = window.localStorage.getItem(MAP_STORAGE_KEY);
-    if (!raw) {
-      return {
-        tiles: createEmptyMap(config),
-        rivalTeams: normalizeRivalTeams(null),
-        ourTeam: normalizeOurTeam(null),
-        enemyTeams: normalizeEnemyTeams(null),
-      };
-    }
-
-    parsed = JSON.parse(raw);
-    return {
-      tiles: normalizeMap(config, parsed),
-      rivalTeams: normalizeRivalTeams(parsed),
-      ourTeam: normalizeOurTeam(parsed),
-      enemyTeams: normalizeEnemyTeams(parsed),
-    };
+    localStorageData = raw ? JSON.parse(raw) : null;
   } catch {
-    return {
-      tiles: createEmptyMap(config),
-      rivalTeams: normalizeRivalTeams(null),
-      ourTeam: normalizeOurTeam(null),
-      enemyTeams: normalizeEnemyTeams(null),
-    };
+    localStorageData = null;
   }
+
+  const parsed = getUpdatedAt(localStorageData) > getUpdatedAt(electronData) ? localStorageData : electronData;
+  if (!parsed) {
+    return emptyState;
+  }
+
+  return {
+    tiles: normalizeMap(config, parsed),
+    rivalTeams: normalizeRivalTeams(parsed),
+    ourTeam: normalizeOurTeam(parsed),
+    enemyTeams: normalizeEnemyTeams(parsed),
+  };
 }
 
 function saveStoredMap(tiles: MapTilesById, rivalTeams: RivalTeam[], ourTeam: OurTeamConfig, enemyTeams: EnemyTeam[]) {
@@ -336,7 +318,7 @@ function saveStoredMap(tiles: MapTilesById, rivalTeams: RivalTeam[], ourTeam: Ou
     code: team.code,
   }));
   const storedEnemyTeams = enemyTeams.map(team => ({
-    color: team.color,
+    id: team.id,
     name: team.name,
     code: team.code,
   }));
@@ -345,14 +327,25 @@ function saveStoredMap(tiles: MapTilesById, rivalTeams: RivalTeam[], ourTeam: Ou
     name: ourTeam.name,
     code: ourTeam.code,
   };
-  const data = { tiles, rivalTeams: storedRivalTeams, ourTeam: storedOurTeam, enemyTeams: storedEnemyTeams };
+  const data = {
+    tiles,
+    rivalTeams: storedRivalTeams,
+    ourTeam: storedOurTeam,
+    enemyTeams: storedEnemyTeams,
+    updatedAt: Date.now(),
+  };
 
-  if (window.electronAPI?.setMapData) {
-    void window.electronAPI.setMapData(data);
-    return;
+  try {
+    window.localStorage.setItem(MAP_STORAGE_KEY, JSON.stringify(data));
+  } catch (err) {
+    console.warn("[GameMapPage] Failed to save via localStorage:", err);
   }
 
-  window.localStorage.setItem(MAP_STORAGE_KEY, JSON.stringify(data));
+  if (window.electronAPI?.setMapData) {
+    window.electronAPI.setMapData(data).catch((err: unknown) => {
+      console.warn("[GameMapPage] Failed to save via Electron API:", err);
+    });
+  }
 }
 
 const createPointSummary = (): MarkerPointSummary => ({
@@ -372,7 +365,7 @@ function MapBoard({
   selectedTileId,
   selectedMarker,
   selectedRivalColor,
-  selectedEnemyColor,
+  selectedEnemyTeamId,
   onSelectTile,
   onPaintTile,
 }: MapBoardProps) {
@@ -405,7 +398,7 @@ function MapBoard({
       <div className="map-board" aria-label="Editable game map">
         {config.tiles.map((tileConfig) => {
           const tile =
-            tiles[tileConfig.id] ?? { marker: "none", rivalColor: initialRivalColors[0], enemyColor: initialEnemyColors[0], note: "" };
+            tiles[tileConfig.id] ?? { marker: "none", rivalColor: initialRivalColors[0], enemyColor: initialEnemyIds[0], note: "" };
 
           return (
             <button
@@ -416,7 +409,7 @@ function MapBoard({
               key={tileConfig.id}
               onClick={() => {
                 onSelectTile(tileConfig.id);
-                onPaintTile(tileConfig.id, selectedMarker, selectedRivalColor, selectedEnemyColor);
+                onPaintTile(tileConfig.id, selectedMarker, selectedRivalColor, selectedEnemyTeamId);
               }}
               onFocus={() => onSelectTile(tileConfig.id)}
               aria-label={`Map tile ${getCoordinate(tileConfig)} ${tileConfig.kind} level ${tileConfig.level}`}
@@ -425,7 +418,7 @@ function MapBoard({
                 gridColumn: `${tileConfig.x} / span ${tileConfig.width}`,
                 gridRow: `${tileConfig.y} / span ${tileConfig.height}`,
                 "--rival-color": tile.rivalColor,
-                "--enemy-color": tile.enemyColor || initialEnemyColors[0],
+                "--enemy-color": ENEMY_COLOR,
               } as CSSProperties}
             >
               {tileConfig.kind === "town" ? (
@@ -449,6 +442,12 @@ export default function GameMapPage() {
   const mapConfig = defaultGameMapConfig;
   const firstTileId = mapConfig.tiles[0]?.id ?? "";
   const hasLoadedStoredMap = useRef(false);
+  const latestStateRef = useRef<{
+    tiles: MapTilesById;
+    rivalTeams: RivalTeam[];
+    ourTeam: OurTeamConfig;
+    enemyTeams: EnemyTeam[];
+  } | null>(null);
   const [tiles, setTiles] = useState<MapTilesById>(() => createEmptyMap(mapConfig));
   const [selectedMarker, setSelectedMarker] = useState<TileMarker>("base");
   const [selectedRivalColor, setSelectedRivalColor] = useState(initialRivalColors[0]);
@@ -456,7 +455,7 @@ export default function GameMapPage() {
   const [rivalTeams, setRivalTeams] = useState<RivalTeam[]>([]);
   const [ourTeam, setOurTeam] = useState<OurTeamConfig>({ color: "#45b66b", name: "Our Team", code: "OUR" });
   const [enemyTeams, setEnemyTeams] = useState<EnemyTeam[]>([]);
-  const [selectedEnemyColor, setSelectedEnemyColor] = useState(initialEnemyColors[0]);
+  const [selectedEnemyTeamId, setSelectedEnemyTeamId] = useState(initialEnemyIds[0]);
 
   useEffect(() => {
     let isMounted = true;
@@ -476,9 +475,27 @@ export default function GameMapPage() {
   }, [mapConfig]);
 
   useEffect(() => {
+    latestStateRef.current = { tiles, rivalTeams, ourTeam, enemyTeams };
+  }, [tiles, rivalTeams, ourTeam, enemyTeams]);
+
+  useEffect(() => {
     if (!hasLoadedStoredMap.current) return;
     saveStoredMap(tiles, rivalTeams, ourTeam, enemyTeams);
   }, [tiles, rivalTeams, ourTeam, enemyTeams]);
+
+  useEffect(() => {
+    const flushLatestState = () => {
+      if (!hasLoadedStoredMap.current || !latestStateRef.current) return;
+      const { tiles: latestTiles, rivalTeams: latestRivalTeams, ourTeam: latestOurTeam, enemyTeams: latestEnemyTeams } = latestStateRef.current;
+      saveStoredMap(latestTiles, latestRivalTeams, latestOurTeam, latestEnemyTeams);
+    };
+
+    window.addEventListener("beforeunload", flushLatestState);
+    return () => {
+      flushLatestState();
+      window.removeEventListener("beforeunload", flushLatestState);
+    };
+  }, []);
 
   const counts = useMemo(
     () =>
@@ -561,8 +578,8 @@ export default function GameMapPage() {
       enemyTeams.reduce<Record<string, number>>(
         (summary, team) => ({
           ...summary,
-          [team.color]: Object.values(tiles).filter(
-            (tile) => tile.marker === "enemy" && tile.enemyColor === team.color
+          [team.id]: Object.values(tiles).filter(
+            (tile) => tile.marker === "enemy" && tile.enemyColor === team.id
           ).length,
         }),
         {}
@@ -574,7 +591,7 @@ export default function GameMapPage() {
     () => {
       const summaryByColor = enemyTeams.reduce<Record<string, MarkerPointSummary>>(
         (summary, team) => {
-          summary[team.color] = createPointSummary();
+          summary[team.id] = createPointSummary();
           return summary;
         },
         {}
@@ -610,7 +627,7 @@ export default function GameMapPage() {
     );
   }
 
-  function updateTile(tileId: string, marker: TileMarker, rivalColor: string, enemyColor?: string) {
+  function updateTile(tileId: string, marker: TileMarker, rivalColor: string, enemyTeamId?: string) {
     setSelectedTileId(tileId);
     setTiles((currentTiles) =>
       currentTiles[tileId]
@@ -620,7 +637,7 @@ export default function GameMapPage() {
             ...currentTiles[tileId],
             marker,
             rivalColor: marker === "rival" ? rivalColor : currentTiles[tileId].rivalColor,
-            enemyColor: marker === "enemy" ? (enemyColor ?? selectedEnemyColor) : currentTiles[tileId].enemyColor,
+            enemyColor: marker === "enemy" ? (enemyTeamId ?? selectedEnemyTeamId) : currentTiles[tileId].enemyColor,
           },
         }
         : currentTiles
@@ -730,22 +747,21 @@ export default function GameMapPage() {
     const newRivalTeams = rivalTeams.filter(t => t.color !== color);
     setRivalTeams(newRivalTeams);
 
-    // Reassign tiles with this color to the first team's color
-    const fallbackColor = newRivalTeams[0]?.color || initialRivalColors[0];
+    // Clear tiles assigned to the removed rival team
     setTiles(prev => {
       const newTiles = { ...prev };
       Object.keys(newTiles).forEach(tileId => {
-        if (newTiles[tileId].rivalColor === color) {
+        if (newTiles[tileId].marker === "rival" && newTiles[tileId].rivalColor === color) {
           newTiles[tileId] = {
             ...newTiles[tileId],
-            rivalColor: fallbackColor
+            marker: "none"
           };
         }
       });
       return newTiles;
     });
 
-    // If the removed color was selected, switch to first team's color
+    const fallbackColor = newRivalTeams[0]?.color || initialRivalColors[0];
     if (selectedRivalColor === color) {
       setSelectedRivalColor(fallbackColor);
     }
@@ -790,52 +806,52 @@ export default function GameMapPage() {
   }
 
   function addEnemy() {
-    const newColor = `#${Math.floor(Math.random()*16777215).toString(16).padStart(6, '0')}`;
     const newTeam: EnemyTeam = {
-      color: newColor,
-      name: "Enemy",
+      id: `enemy-${crypto.randomUUID()}`,
+      name: `Enemy ${enemyTeams.length + 1}`,
       code: generateRandomCode(),
     };
     setEnemyTeams(prev => [...prev, newTeam]);
+    setSelectedEnemyTeamId(newTeam.id);
   }
 
-  function removeEnemy(color: string) {
+  function removeEnemy(id: string) {
     if (enemyTeams.length <= 1) return;
 
-    const newEnemyTeams = enemyTeams.filter(t => t.color !== color);
+    const newEnemyTeams = enemyTeams.filter(t => t.id !== id);
     setEnemyTeams(newEnemyTeams);
 
     setTiles(prev => {
       const newTiles = { ...prev };
       Object.keys(newTiles).forEach(tileId => {
-        if (newTiles[tileId].enemyColor === color) {
+        if (newTiles[tileId].marker === "enemy" && newTiles[tileId].enemyColor === id) {
           newTiles[tileId] = {
             ...newTiles[tileId],
-            enemyColor: newEnemyTeams[0]?.color || initialEnemyColors[0]
+            marker: "none"
           };
         }
       });
       return newTiles;
     });
 
-    if (selectedEnemyColor === color) {
-      setSelectedEnemyColor(newEnemyTeams[0]?.color || initialEnemyColors[0]);
+    if (selectedEnemyTeamId === id) {
+      setSelectedEnemyTeamId(newEnemyTeams[0]?.id || initialEnemyIds[0]);
     }
   }
 
-  function updateEnemyName(color: string, name: string) {
+  function updateEnemyName(id: string, name: string) {
     setEnemyTeams(prev =>
       prev.map(team =>
-        team.color === color ? { ...team, name } : team
+        team.id === id ? { ...team, name } : team
       )
     );
   }
 
-  function updateEnemyCode(color: string, code: string) {
+  function updateEnemyCode(id: string, code: string) {
     const normalized = code.substring(0, 3).toUpperCase().replace(/[^A-Z]/g, "");
     setEnemyTeams(prev =>
       prev.map(team =>
-        team.color === color ? { ...team, code: normalized || "XXX" } : team
+        team.id === id ? { ...team, code: normalized || "XXX" } : team
       )
     );
   }
@@ -870,84 +886,44 @@ export default function GameMapPage() {
             </button>
           ))}
           {rivalTeams.map((team) => (
-            <div key={team.color} className="rival-tool-container">
-              <button
-                className={`icon-tool-button rival ${
-                  selectedMarker === "rival" && selectedRivalColor === team.color ? "active" : ""
-                }`}
-                type="button"
-                title={team.name}
-                aria-label={team.name}
-                onClick={() => {
-                  setSelectedMarker("rival");
-                  setSelectedRivalColor(team.color);
-                }}
-                style={{ "--rival-color": team.color } as CSSProperties}
-              >
-                <span>{team.code}</span>
-                <span className="tool-count">{rivalCounts[team.color] ?? 0}</span>
-              </button>
-              <button
-                className="remove-rival-button"
-                type="button"
-                title={`Remove ${team.name}`}
-                aria-label={`Remove ${team.name}`}
-                onClick={() => removeRival(team.color)}
-                disabled={rivalTeams.length <= 1}
-              >
-                ×
-              </button>
-            </div>
+            <button
+              key={team.color}
+              className={`icon-tool-button rival ${
+                selectedMarker === "rival" && selectedRivalColor === team.color ? "active" : ""
+              }`}
+              type="button"
+              title={team.name}
+              aria-label={team.name}
+              onClick={() => {
+                setSelectedMarker("rival");
+                setSelectedRivalColor(team.color);
+              }}
+              style={{ "--rival-color": team.color } as CSSProperties}
+            >
+              <span>{team.code}</span>
+              <span className="tool-count">{rivalCounts[team.color] ?? 0}</span>
+            </button>
           ))}
-          <button
-            className="add-rival-button"
-            type="button"
-            title="Add New Rival"
-            aria-label="Add New Rival"
-            onClick={addRival}
-          >
-            +
-          </button>
 
           {enemyTeams.map((team) => (
-            <div key={team.color} className="rival-tool-container">
-              <button
-                className={`icon-tool-button enemy-team ${
-                  selectedMarker === "enemy" && selectedEnemyColor === team.color ? "active" : ""
-                }`}
-                type="button"
-                title={team.name}
-                aria-label={team.name}
-                onClick={() => {
-                  setSelectedMarker("enemy");
-                  setSelectedEnemyColor(team.color);
-                }}
-                style={{ "--enemy-color": team.color } as CSSProperties}
-              >
-                <span>{team.code}</span>
-                <span className="tool-count">{enemyCounts[team.color] ?? 0}</span>
-              </button>
-              <button
-                className="remove-rival-button"
-                type="button"
-                title={`Remove ${team.name}`}
-                aria-label={`Remove ${team.name}`}
-                onClick={() => removeEnemy(team.color)}
-                disabled={enemyTeams.length <= 1}
-              >
-                ×
-              </button>
-            </div>
+            <button
+              key={team.id}
+              className={`icon-tool-button enemy-team ${
+                selectedMarker === "enemy" && selectedEnemyTeamId === team.id ? "active" : ""
+              }`}
+              type="button"
+              title={team.name}
+              aria-label={team.name}
+              onClick={() => {
+                setSelectedMarker("enemy");
+                setSelectedEnemyTeamId(team.id);
+              }}
+              style={{ "--enemy-color": ENEMY_COLOR } as CSSProperties}
+            >
+              <span>{team.code}</span>
+              <span className="tool-count">{enemyCounts[team.id] ?? 0}</span>
+            </button>
           ))}
-          <button
-            className="add-rival-button"
-            type="button"
-            title="Add New Enemy Team"
-            aria-label="Add New Enemy Team"
-            onClick={addEnemy}
-          >
-            +
-          </button>
         </div>
       </div>
 
@@ -959,7 +935,7 @@ export default function GameMapPage() {
             selectedTileId={selectedTileId}
             selectedMarker={selectedMarker}
             selectedRivalColor={selectedRivalColor}
-            selectedEnemyColor={selectedEnemyColor}
+            selectedEnemyTeamId={selectedEnemyTeamId}
             onSelectTile={setSelectedTileId}
             onPaintTile={updateTile}
           />
@@ -967,6 +943,10 @@ export default function GameMapPage() {
 
         <aside className="map-score-panel" aria-label="Map score summary">
           {/* Our Team - can edit name, code, and color */}
+          <div className="score-group-label">
+            <span>Our Team</span>
+          </div>
+
           <div
             className="score-row our-team"
             key={ourTeam.color}
@@ -996,14 +976,37 @@ export default function GameMapPage() {
               />
             </div>
             {renderPointSummary(ourTeamPointSummary)}
+            <button
+              className="remove-team-button"
+              type="button"
+              title={`Remove ${ourTeam.name}`}
+              aria-label={`Remove ${ourTeam.name}`}
+              onClick={() => removeRival(ourTeam.color)}
+              disabled={rivalTeams.length <= 1}
+            >
+              ×
+            </button>
           </div>
 
           {/* Enemy teams - can only edit name and code (no color picker) */}
+          <div className="score-group-label">
+            <span>Enemy Teams</span>
+            <button
+              className="aside-add-button"
+              type="button"
+              title="Add New Enemy Team"
+              aria-label="Add New Enemy Team"
+              onClick={addEnemy}
+            >
+              +
+            </button>
+          </div>
+
           {enemyTeams.map((team) => (
             <div
               className="score-row enemy-team"
-              key={team.color}
-              style={{ "--score-color": team.color } as CSSProperties}
+              key={team.id}
+              style={{ "--score-color": ENEMY_COLOR } as CSSProperties}
             >
               <span className="score-color" aria-hidden="true" />
               <div className="rival-input-container">
@@ -1011,22 +1014,45 @@ export default function GameMapPage() {
                   aria-label={`${team.name} name`}
                   value={team.name}
                   maxLength={16}
-                  onChange={(event) => updateEnemyName(team.color, event.target.value)}
+                  onChange={(event) => updateEnemyName(team.id, event.target.value)}
                 />
                 <input
                   type="text"
                   className="enemy-code-input"
                   value={team.code}
                   maxLength={3}
-                  onChange={(event) => updateEnemyCode(team.color, event.target.value)}
+                  onChange={(event) => updateEnemyCode(team.id, event.target.value)}
                   title={`Change code for ${team.name}`}
                 />
               </div>
-              {renderPointSummary(enemyPointSummary[team.color])}
+              {renderPointSummary(enemyPointSummary[team.id])}
+              <button
+                className="remove-team-button"
+                type="button"
+                title={`Remove ${team.name}`}
+                aria-label={`Remove ${team.name}`}
+                onClick={() => removeEnemy(team.id)}
+                disabled={enemyTeams.length <= 1}
+              >
+                ×
+              </button>
             </div>
           ))}
 
           {/* Rival teams - can edit name, code, and color */}
+          <div className="score-group-label">
+            <span>Rival Teams</span>
+            <button
+              className="aside-add-button"
+              type="button"
+              title="Add New Rival Team"
+              aria-label="Add New Rival Team"
+              onClick={addRival}
+            >
+              +
+            </button>
+          </div>
+
           {rivalTeams.map((team) => (
             <div
               className="score-row rival"
@@ -1058,6 +1084,16 @@ export default function GameMapPage() {
                 />
               </div>
               {renderPointSummary(rivalPointSummary[team.color])}
+              <button
+                className="remove-team-button"
+                type="button"
+                title={`Remove ${team.name}`}
+                aria-label={`Remove ${team.name}`}
+                onClick={() => removeRival(team.color)}
+                disabled={rivalTeams.length <= 1}
+              >
+                ×
+              </button>
             </div>
           ))}
         </aside>
