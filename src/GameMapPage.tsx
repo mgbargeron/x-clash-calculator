@@ -461,6 +461,14 @@ function MapBoard({
                 onSelectTile(tileConfig.id);
                 onPaintTile(tileConfig.id, selectedMarker, selectedRivalColor, selectedEnemyTeamId);
               }}
+              onContextMenu={(event) => {
+                if (selectedTileId !== tileConfig.id) {
+                  return;
+                }
+
+                event.preventDefault();
+                onPaintTile(tileConfig.id, "none", selectedRivalColor, selectedEnemyTeamId);
+              }}
               onFocus={() => onSelectTile(tileConfig.id)}
               aria-label={`Map tile ${getCoordinate(tileConfig)} ${tileConfig.kind} level ${tileConfig.level}`}
               title={tile.note || `${getCoordinate(tileConfig)} ${tileConfig.kind} level ${tileConfig.level}`}
@@ -499,7 +507,7 @@ export default function GameMapPage() {
   const [selectedMarker, setSelectedMarker] = useState<TileMarker>("base");
   const [selectedRivalColor, setSelectedRivalColor] = useState(initialRivalColors[0]);
   const [selectedTileId, setSelectedTileId] = useState(firstTileId);
-  const [teamManagementLocked, setTeamManagementLocked] = useState(false);
+  const [teamManagementLocked, setTeamManagementLocked] = useState(true);
   const [rivalTeams, setRivalTeams] = useState<RivalTeam[]>([]);
   const [ourTeam, setOurTeam] = useState<OurTeamConfig>({ color: "#45b66b", name: "Our Team", code: "OUR" });
   const [enemyTeams, setEnemyTeams] = useState<EnemyTeam[]>([]);
@@ -566,10 +574,10 @@ export default function GameMapPage() {
         tiles: storedMap.tiles,
         rivalTeams: storedMap.rivalTeams.length > 0 ? storedMap.rivalTeams : normalizeRivalTeams(null),
         ourTeam: storedMap.ourTeam,
-        enemyTeams: storedMap.enemyTeams.length > 0 ? storedMap.enemyTeams : normalizeEnemyTeams(null),
+        enemyTeams: storedMap.enemyTeams,
         selectedTileId: firstTileId,
-        selectedRivalColor: initialRivalColors[0],
-        selectedEnemyTeamId: initialEnemyIds[0],
+        selectedRivalColor: storedMap.rivalTeams[0]?.color ?? initialRivalColors[0],
+        selectedEnemyTeamId: storedMap.enemyTeams[0]?.id ?? "",
       });
       undoStackRef.current = [];
       hasLoadedStoredMap.current = true;
@@ -943,7 +951,7 @@ export default function GameMapPage() {
 
   function removeEnemy(id: string) {
     commitAction((current) => {
-      if (current.enemyTeams.length <= 1) return current;
+      if (current.enemyTeams.length === 0) return current;
 
       const newEnemyTeams = current.enemyTeams.filter((team) => team.id !== id);
       const nextTiles = { ...current.tiles };
@@ -961,9 +969,13 @@ export default function GameMapPage() {
         enemyTeams: newEnemyTeams,
         tiles: nextTiles,
         selectedEnemyTeamId:
-          current.selectedEnemyTeamId === id ? (newEnemyTeams[0]?.id || initialEnemyIds[0]) : current.selectedEnemyTeamId,
+          current.selectedEnemyTeamId === id ? (newEnemyTeams[0]?.id || "") : current.selectedEnemyTeamId,
       };
     });
+
+    if (enemyTeams.length === 1 && selectedMarker === "enemy") {
+      setSelectedMarker("base");
+    }
   }
 
   function updateEnemyName(id: string, name: string) {
@@ -1264,7 +1276,7 @@ export default function GameMapPage() {
                 title={`Remove ${team.name}`}
                 aria-label={`Remove ${team.name}`}
                 onClick={() => removeEnemy(team.id)}
-                disabled={teamManagementLocked || enemyTeams.length <= 1}
+                disabled={teamManagementLocked}
               >
                 ×
               </button>

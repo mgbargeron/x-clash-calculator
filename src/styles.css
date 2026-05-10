@@ -406,7 +406,7 @@ h1 {
     display: grid;
     gap: 3px;
     color: #b9c7ff;
-    font-size: 0.68rem;
+    font-size: clamp(0.46rem, calc(var(--map-key-size) * 0.48), 0.68rem);
     font-weight: 800;
     line-height: 1;
 }
