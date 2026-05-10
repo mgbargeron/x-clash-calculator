@@ -44,6 +44,7 @@
     background: #0f1220;
     --score-color: #9db1ff;
     --rival-color: #d8aa32;
+    --enemy-color: #cf3f45;
 }
 
 * {
@@ -238,23 +239,6 @@ h1 {
     background: var(--score-color, #9db1ff);
 }
 
-.score-row.rival {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 8px 12px;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.score-row.rival .score-color {
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background: var(--score-color);
-}
-
 .score-row strong,
 .score-row input {
     min-width: 0;
@@ -374,7 +358,7 @@ h1 {
 }
 
 .map-tile.enemy {
-    box-shadow: inset 0 0 0 3px #cf3f45;
+    box-shadow: inset 0 0 0 3px var(--enemy-color, #cf3f45);
 }
 
 .map-tile.rival {
@@ -489,6 +473,11 @@ h1 {
     color: #10131d;
 }
 
+.icon-tool-button.enemy-team {
+    background: var(--enemy-color, #cf3f45);
+    color: #10131d;
+}
+
 .icon-tool-button.none {
     background: rgba(255, 255, 255, 0.08);
 }
@@ -522,27 +511,62 @@ h1 {
 
 .rival-input-container {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
   min-width: 120px;
 }
 
+.rival-input-container input:not([type="color"]) {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: auto !important;
+  height: 28px;
+  padding: 4px 6px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  background: rgba(10, 14, 28, 0.42);
+  outline: none;
+}
+
 .rival-color-picker {
-  width: 100%;
-  height: 24px;
+  width: 20px !important;
+  height: 20px !important;
+  flex: none;
   border: none;
   border-radius: 4px;
   cursor: pointer;
   padding: 0;
+  margin: 0;
 }
 
 .rival-color-picker::-webkit-color-swatch {
+  width: 100% !important;
+  height: 100% !important;
   border-radius: 4px;
-  border: none;
+  border: none !important;
 }
 
 .rival-color-picker::-webkit-color-swatch-wrapper {
   padding: 0;
+  width: 100% !important;
+  height: 100% !important;
+  border-radius: 4px;
+}
+
+.rival-color-picker::-moz-color-swatch {
+  width: 100% !important;
+  height: 100% !important;
+  border-radius: 4px;
+  border: none !important;
+}
+
+.enemy-code-input {
+  width: 36px !important;
+  flex: none;
+  text-align: center;
+  font-weight: 900;
+  letter-spacing: 0.05em;
 }
 
 .remove-rival-button {

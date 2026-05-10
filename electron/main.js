@@ -49,6 +49,15 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  // Suppress this specific Electron macOS framework warning (cosmetic only)
+  const origError = console.error
+  console.error = function (...args) {
+    if (typeof args[0] === 'string' && args[0].includes('representedObject is not a WeakPtrToElectronMenuModelAsNSObject')) {
+      return // Silence this warning
+    }
+    origError.apply(console, args)
+  }
+
   createWindow()
 
   app.on('activate', () => {
