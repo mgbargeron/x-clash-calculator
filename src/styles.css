@@ -503,6 +503,22 @@ h1 {
     line-height: 1;
 }
 
+.icon-tool-button.team-tool-button {
+    width: 52px;
+    min-width: 52px;
+    padding: 0 8px;
+}
+
+.team-code {
+    display: block;
+    min-width: 3ch;
+    text-align: center;
+    font-size: 0.8rem;
+    font-weight: 800;
+    line-height: 1;
+    white-space: nowrap;
+}
+
 .tool-count {
     position: absolute;
     right: -6px;

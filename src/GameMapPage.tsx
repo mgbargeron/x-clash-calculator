@@ -61,9 +61,8 @@ type StoredEnemyTeam = {
 
 const MAP_STORAGE_KEY = "game-map-v1";
 
-const markerTools: Array<{ marker: Exclude<TileMarker, "rival">; label: string; icon: string }> = [
+const markerTools: Array<{ marker: "none"; label: string; icon: string }> = [
   { marker: "none", label: "Clear marker", icon: "C" },
-  { marker: "base", label: "Our base", icon: "B" },
 ];
 
 // Initialize with default colors but allow for dynamic addition
@@ -117,6 +116,10 @@ function generateRandomCode(): string {
     code += chars[Math.floor(Math.random() * chars.length)];
   }
   return code;
+}
+
+function formatTeamDisplayLabel(code: string, name: string): string {
+  return `[${code.substring(0, 3).toUpperCase()}]${name.substring(0, 16)}`;
 }
 
 type MapTilesById = Record<string, MapTile>;
@@ -885,22 +888,34 @@ export default function GameMapPage() {
               <span className="tool-count">{counts[tool.marker]}</span>
             </button>
           ))}
+          <button
+            className={`icon-tool-button base team-tool-button ${
+              selectedMarker === "base" ? "active" : ""
+            }`}
+            type="button"
+            title={formatTeamDisplayLabel(ourTeam.code, ourTeam.name)}
+            aria-label={formatTeamDisplayLabel(ourTeam.code, ourTeam.name)}
+            onClick={() => setSelectedMarker("base")}
+          >
+            <span className="team-code">{ourTeam.code}</span>
+            <span className="tool-count">{counts.base}</span>
+          </button>
           {rivalTeams.map((team) => (
             <button
               key={team.color}
-              className={`icon-tool-button rival ${
+              className={`icon-tool-button rival team-tool-button ${
                 selectedMarker === "rival" && selectedRivalColor === team.color ? "active" : ""
               }`}
               type="button"
-              title={team.name}
-              aria-label={team.name}
+              title={formatTeamDisplayLabel(team.code, team.name)}
+              aria-label={formatTeamDisplayLabel(team.code, team.name)}
               onClick={() => {
                 setSelectedMarker("rival");
                 setSelectedRivalColor(team.color);
               }}
               style={{ "--rival-color": team.color } as CSSProperties}
             >
-              <span>{team.code}</span>
+              <span className="team-code">{team.code}</span>
               <span className="tool-count">{rivalCounts[team.color] ?? 0}</span>
             </button>
           ))}
@@ -908,19 +923,19 @@ export default function GameMapPage() {
           {enemyTeams.map((team) => (
             <button
               key={team.id}
-              className={`icon-tool-button enemy-team ${
+              className={`icon-tool-button enemy-team team-tool-button ${
                 selectedMarker === "enemy" && selectedEnemyTeamId === team.id ? "active" : ""
               }`}
               type="button"
-              title={team.name}
-              aria-label={team.name}
+              title={formatTeamDisplayLabel(team.code, team.name)}
+              aria-label={formatTeamDisplayLabel(team.code, team.name)}
               onClick={() => {
                 setSelectedMarker("enemy");
                 setSelectedEnemyTeamId(team.id);
               }}
               style={{ "--enemy-color": ENEMY_COLOR } as CSSProperties}
             >
-              <span>{team.code}</span>
+              <span className="team-code">{team.code}</span>
               <span className="tool-count">{enemyCounts[team.id] ?? 0}</span>
             </button>
           ))}
@@ -957,6 +972,7 @@ export default function GameMapPage() {
               <input
                 aria-label={`${ourTeam.name} name`}
                 value={ourTeam.name}
+                maxLength={16}
                 onChange={(event) => updateOurTeamName(event.target.value)}
               />
               <input
