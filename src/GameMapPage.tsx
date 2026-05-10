@@ -480,12 +480,6 @@ export default function GameMapPage() {
     saveStoredMap(tiles, rivalTeams, ourTeam, enemyTeams);
   }, [tiles, rivalTeams, ourTeam, enemyTeams]);
 
-  const selectedTileConfig =
-    mapConfig.tiles.find((tile) => tile.id === selectedTileId) ?? mapConfig.tiles[0];
-  const selectedTileLabel = selectedTileConfig ? getCoordinate(selectedTileConfig) : "";
-  const selectedTile =
-    tiles[selectedTileId] ?? { marker: "none", rivalColor: initialRivalColors[0], enemyColor: initialEnemyColors[0], note: "" };
-
   const counts = useMemo(
     () =>
       (["none", "base", "enemy", "rival"] as TileMarker[]).reduce<Record<string, number>>(
@@ -633,16 +627,6 @@ export default function GameMapPage() {
     );
   }
 
-  function updateSelectedNote(note: string) {
-    setTiles((currentTiles) =>
-      currentTiles[selectedTileId]
-        ? {
-          ...currentTiles,
-          [selectedTileId]: { ...currentTiles[selectedTileId], note },
-        }
-        : currentTiles
-    );
-  }
 
   function resetMap() {
     setTiles(createEmptyMap(mapConfig));
@@ -1077,17 +1061,6 @@ export default function GameMapPage() {
             </div>
           ))}
         </aside>
-      </div>
-
-      <div className="map-details">
-        <label className="note-field">
-          <span>Tile {selectedTileLabel}</span>
-          <textarea
-            value={selectedTile.note}
-            onChange={(event) => updateSelectedNote(event.target.value)}
-            placeholder="Add target, timer, or player note"
-          />
-        </label>
       </div>
     </section>
   );
