@@ -102,8 +102,7 @@ body {
 }
 
 .nav-button.active,
-.tool-button.active,
-.icon-tool-button.active {
+.tool-button.active {
     border-color: #9db1ff;
     background: #33447a;
 }
@@ -176,7 +175,7 @@ h1 {
 
 .map-layout {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 280px;
+    grid-template-columns: minmax(0, 1fr) 400px;
     gap: 14px;
     align-items: start;
     width: 100%;
@@ -503,10 +502,26 @@ h1 {
     line-height: 1;
 }
 
+.icon-tool-button.clear-tool-button {
+    width: 78px;
+    min-width: 78px;
+    padding: 0 8px;
+}
+
 .icon-tool-button.team-tool-button {
     width: 52px;
     min-width: 52px;
     padding: 0 8px;
+}
+
+.tool-inline-label {
+    display: block;
+    min-width: 0;
+    text-align: center;
+    font-size: 0.8rem;
+    font-weight: 800;
+    line-height: 1;
+    white-space: nowrap;
 }
 
 .team-code {
@@ -555,6 +570,22 @@ h1 {
     color: #10131d;
 }
 
+.icon-tool-button.active {
+    border-color: rgba(157, 177, 255, 0.95);
+    border-width: 2px;
+    transform: translateY(-1px);
+}
+
+.icon-tool-button.rival.active,
+.icon-tool-button.enemy-team.active,
+.icon-tool-button.base.active {
+    filter: saturate(1.08) brightness(1.06);
+}
+
+.icon-tool-button.none.active {
+    background: rgba(255, 255, 255, 0.18);
+}
+
 .icon-tool-button.none {
     background: rgba(255, 255, 255, 0.08);
 }
@@ -587,17 +618,17 @@ h1 {
 }
 
 .rival-input-container {
-  display: flex;
-  flex-direction: row;
+  display: grid;
+  grid-template-columns: 5ch minmax(0, 1fr) auto;
   align-items: center;
   gap: 8px;
-  min-width: 120px;
+  min-width: 0;
+  width: 100%;
 }
 
 .rival-input-container input:not([type="color"]) {
-  flex: 1 1 auto;
   min-width: 0;
-  width: auto !important;
+  width: 100%;
   height: 28px;
   padding: 4px 6px;
   border: 1px solid rgba(255, 255, 255, 0.12);
@@ -639,11 +670,17 @@ h1 {
 }
 
 .enemy-code-input {
-  width: 36px !important;
-  flex: none;
+  width: 100% !important;
+  min-width: 0;
+  padding: 4px 6px !important;
   text-align: center;
   font-weight: 900;
-  letter-spacing: 0.05em;
+  letter-spacing: 0;
+}
+
+.team-name-input {
+  width: 100% !important;
+  min-width: 16ch;
 }
 
 .remove-rival-button {

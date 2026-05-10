@@ -119,7 +119,9 @@ function generateRandomCode(): string {
 }
 
 function formatTeamDisplayLabel(code: string, name: string): string {
-  return `[${code.substring(0, 3).toUpperCase()}]${name.substring(0, 16)}`;
+  const normalizedCode = code.substring(0, 3).toUpperCase() || "XXX";
+  const normalizedName = name.trim() || "Unnamed";
+  return `[${normalizedCode}]${normalizedName}`;
 }
 
 type MapTilesById = Record<string, MapTile>;
@@ -500,30 +502,9 @@ export default function GameMapPage() {
     };
   }, []);
 
-  const counts = useMemo(
-    () =>
-      (["none", "base", "enemy", "rival"] as TileMarker[]).reduce<Record<string, number>>(
-        (summary, marker) => ({
-          ...summary,
-          [marker]: Object.values(tiles).filter((tile) => tile.marker === marker).length,
-        }),
-        { none: 0, base: 0, enemy: 0, rival: 0 }
-      ),
+  const clearMarkerCount = useMemo(
+    () => Object.values(tiles).filter((tile) => tile.marker === "none").length,
     [tiles]
-  );
-
-  const rivalCounts = useMemo(
-    () =>
-      rivalTeams.reduce<Record<string, number>>(
-        (summary, team) => ({
-          ...summary,
-          [team.color]: Object.values(tiles).filter(
-            (tile) => tile.marker === "rival" && tile.rivalColor === team.color
-          ).length,
-        }),
-        {}
-      ),
-    [tiles, rivalTeams]
   );
 
   const rivalPointSummary = useMemo(
@@ -574,20 +555,6 @@ export default function GameMapPage() {
       return summary;
     },
     [mapConfig.tiles, tiles]
-  );
-
-  const enemyCounts = useMemo(
-    () =>
-      enemyTeams.reduce<Record<string, number>>(
-        (summary, team) => ({
-          ...summary,
-          [team.id]: Object.values(tiles).filter(
-            (tile) => tile.marker === "enemy" && tile.enemyColor === team.id
-          ).length,
-        }),
-        {}
-      ),
-    [tiles, enemyTeams]
   );
 
   const enemyPointSummary = useMemo(
@@ -875,7 +842,7 @@ export default function GameMapPage() {
         <div className="tile-tools">
           {markerTools.map((tool) => (
             <button
-              className={`icon-tool-button ${tool.marker} ${
+              className={`icon-tool-button clear-tool-button ${tool.marker} ${
                 selectedMarker === tool.marker ? "active" : ""
               }`}
               type="button"
@@ -884,8 +851,9 @@ export default function GameMapPage() {
               aria-label={tool.label}
               onClick={() => setSelectedMarker(tool.marker)}
             >
-              <span>{tool.icon}</span>
-              <span className="tool-count">{counts[tool.marker]}</span>
+              <span className="tool-inline-label">
+                {tool.icon} | {clearMarkerCount}
+              </span>
             </button>
           ))}
           <button
@@ -898,7 +866,6 @@ export default function GameMapPage() {
             onClick={() => setSelectedMarker("base")}
           >
             <span className="team-code">{ourTeam.code}</span>
-            <span className="tool-count">{counts.base}</span>
           </button>
           {rivalTeams.map((team) => (
             <button
@@ -916,7 +883,6 @@ export default function GameMapPage() {
               style={{ "--rival-color": team.color } as CSSProperties}
             >
               <span className="team-code">{team.code}</span>
-              <span className="tool-count">{rivalCounts[team.color] ?? 0}</span>
             </button>
           ))}
 
@@ -936,7 +902,6 @@ export default function GameMapPage() {
               style={{ "--enemy-color": ENEMY_COLOR } as CSSProperties}
             >
               <span className="team-code">{team.code}</span>
-              <span className="tool-count">{enemyCounts[team.id] ?? 0}</span>
             </button>
           ))}
         </div>
@@ -970,18 +935,19 @@ export default function GameMapPage() {
             <span className="score-color" aria-hidden="true" />
             <div className="rival-input-container">
               <input
-                aria-label={`${ourTeam.name} name`}
-                value={ourTeam.name}
-                maxLength={16}
-                onChange={(event) => updateOurTeamName(event.target.value)}
-              />
-              <input
                 type="text"
                 className="enemy-code-input"
                 value={ourTeam.code}
                 maxLength={3}
                 onChange={(event) => updateOurTeamCode(event.target.value)}
                 title={`Change code for ${ourTeam.name}`}
+              />
+              <input
+                className="team-name-input"
+                aria-label={`${ourTeam.name} name`}
+                value={ourTeam.name}
+                maxLength={16}
+                onChange={(event) => updateOurTeamName(event.target.value)}
               />
               <input
                 type="color"
@@ -1027,18 +993,19 @@ export default function GameMapPage() {
               <span className="score-color" aria-hidden="true" />
               <div className="rival-input-container">
                 <input
-                  aria-label={`${team.name} name`}
-                  value={team.name}
-                  maxLength={16}
-                  onChange={(event) => updateEnemyName(team.id, event.target.value)}
-                />
-                <input
                   type="text"
                   className="enemy-code-input"
                   value={team.code}
                   maxLength={3}
                   onChange={(event) => updateEnemyCode(team.id, event.target.value)}
                   title={`Change code for ${team.name}`}
+                />
+                <input
+                  className="team-name-input"
+                  aria-label={`${team.name} name`}
+                  value={team.name}
+                  maxLength={16}
+                  onChange={(event) => updateEnemyName(team.id, event.target.value)}
                 />
               </div>
               {renderPointSummary(enemyPointSummary[team.id])}
@@ -1078,18 +1045,19 @@ export default function GameMapPage() {
               <span className="score-color" aria-hidden="true" />
               <div className="rival-input-container">
                 <input
-                  aria-label={`${team.name} name`}
-                  value={team.name}
-                  maxLength={16}
-                  onChange={(event) => updateRivalName(team.color, event.target.value)}
-                />
-                <input
                   type="text"
                   className="enemy-code-input"
                   value={team.code}
                   maxLength={3}
                   onChange={(event) => updateRivalCode(team.color, event.target.value)}
                   title={`Change code for ${team.name}`}
+                />
+                <input
+                  className="team-name-input"
+                  aria-label={`${team.name} name`}
+                  value={team.name}
+                  maxLength={16}
+                  onChange={(event) => updateRivalName(team.color, event.target.value)}
                 />
                 <input
                   type="color"
