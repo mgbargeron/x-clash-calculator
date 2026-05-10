@@ -59,8 +59,8 @@ const getInitialHeroExpRows = (values: string[]): Row[] => [
 ];
 
 const columnHeaders = ["Blue Chest", "Purple Chest", "Legendary Chest"];
-const rowHeaders = ["Resources", "Gold", "Hero exp"];
-type Page = "calculator" | "map";
+const calculatorRowHeaders = ["Resources", "Gold"];
+type Page = "calculator" | "heroExp" | "map";
 
 function loadInitialGridValues(): string[][] {
   try {
@@ -86,28 +86,15 @@ function loadInitialGridValues(): string[][] {
   }
 }
 
-function CalculatorPage() {
-  const [gridValues, setGridValues] = useState<string[][]>(() => loadInitialGridValues());
+type CalculatorPageProps = {
+  gridValues: string[][];
+  updateGridCell: (rowIndex: number, columnIndex: number, value: string) => void;
+};
 
-  useEffect(() => {
-    window.localStorage.setItem(GRID_STORAGE_KEY, JSON.stringify(gridValues));
-  }, [gridValues]);
-
-  const updateGridCell = (rowIndex: number, columnIndex: number, value: string) => {
-    const sanitized = sanitizeNumericInput(value);
-    setGridValues((current) =>
-      current.map((row, rIdx) =>
-        rIdx === rowIndex
-          ? row.map((cell, cIdx) => (cIdx === columnIndex ? sanitized : cell))
-          : row
-      )
-    );
-  };
-
+function CalculatorPage({gridValues, updateGridCell}: CalculatorPageProps) {
   const initialWheatRows: Row[] = getInitialResourceRows(gridValues[0]);
   const initialIronRows: Row[] = getInitialResourceRows(gridValues[0]);
   const initialGoldRows: Row[] = getInitialGoldRows(gridValues[1]);
-  const initialHeroExpRows: Row[] = getInitialHeroExpRows(gridValues[2]);
 
   return (
     <section className="card calculator">
@@ -126,7 +113,7 @@ function CalculatorPage() {
             </div>
           ))}
 
-          {rowHeaders.map((rowLabel, rowIndex) => (
+          {calculatorRowHeaders.map((rowLabel, rowIndex) => (
             <div className="table-row" key={rowLabel}>
               <div className="cell-display">{rowLabel}</div>
               {columnHeaders.map((_, columnIndex) => (
@@ -168,6 +155,56 @@ function CalculatorPage() {
               storageKey={GOLD_STORAGE_KEY}
             />
           </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+type HeroExpPageProps = {
+  gridValues: string[][];
+  updateGridCell: (rowIndex: number, columnIndex: number, value: string) => void;
+};
+
+function HeroExpPage({gridValues, updateGridCell}: HeroExpPageProps) {
+  const initialHeroExpRows: Row[] = getInitialHeroExpRows(gridValues[2]);
+
+  return (
+    <section className="card calculator">
+      <p className="eyebrow">Hero progression</p>
+      <h1>Hero Exp Calculator</h1>
+      <p className="description">
+        Set hero exp chest values, then enter quantities to total your available exp.
+      </p>
+
+      <div className="tables-container">
+        <div className="table">
+          <div className="table-header"></div>
+          {columnHeaders.map((header) => (
+            <div className="table-header" key={header}>
+              {header}
+            </div>
+          ))}
+
+          <div className="table-row">
+            <div className="cell-display">Hero exp</div>
+            {columnHeaders.map((_, columnIndex) => (
+              <input
+                key={`hero-exp-${columnIndex}`}
+                className="cell-input"
+                type="text"
+                inputMode="decimal"
+                placeholder="0"
+                value={formatInputValue(gridValues[2][columnIndex])}
+                onChange={(event) =>
+                  updateGridCell(2, columnIndex, event.target.value)
+                }
+              />
+            ))}
+          </div>
+        </div>
+
+        <div className="tables-container">
           <div className="calculator-wrapper">
             <CalculationTable
               initialRows={initialHeroExpRows}
@@ -183,6 +220,22 @@ function CalculatorPage() {
 
 export default function App() {
   const [page, setPage] = useState<Page>("calculator");
+  const [gridValues, setGridValues] = useState<string[][]>(() => loadInitialGridValues());
+
+  useEffect(() => {
+    window.localStorage.setItem(GRID_STORAGE_KEY, JSON.stringify(gridValues));
+  }, [gridValues]);
+
+  const updateGridCell = (rowIndex: number, columnIndex: number, value: string) => {
+    const sanitized = sanitizeNumericInput(value);
+    setGridValues((current) =>
+      current.map((row, rIdx) =>
+        rIdx === rowIndex
+          ? row.map((cell, cIdx) => (cIdx === columnIndex ? sanitized : cell))
+          : row
+      )
+    );
+  };
 
   return (
     <main className="app">
@@ -195,6 +248,13 @@ export default function App() {
           Calculator
         </button>
         <button
+          className={`nav-button ${page === "heroExp" ? "active" : ""}`}
+          type="button"
+          onClick={() => setPage("heroExp")}
+        >
+          Hero Exp
+        </button>
+        <button
           className={`nav-button ${page === "map" ? "active" : ""}`}
           type="button"
           onClick={() => setPage("map")}
@@ -202,7 +262,13 @@ export default function App() {
           Game Map
         </button>
       </nav>
-      {page === "calculator" ? <CalculatorPage /> : <GameMapPage />}
+      {page === "calculator" ? (
+        <CalculatorPage gridValues={gridValues} updateGridCell={updateGridCell} />
+      ) : page === "heroExp" ? (
+        <HeroExpPage gridValues={gridValues} updateGridCell={updateGridCell} />
+      ) : (
+        <GameMapPage />
+      )}
     </main>
   );
 }
