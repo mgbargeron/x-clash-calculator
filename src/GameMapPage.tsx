@@ -162,6 +162,18 @@ type MarkerPointSummary = {
   frostMinePoints: number;
 };
 
+type GameMapSnapshot = {
+  tiles: MapTilesById;
+  rivalTeams: RivalTeam[];
+  ourTeam: OurTeamConfig;
+  enemyTeams: EnemyTeam[];
+  selectedTileId: string;
+  selectedRivalColor: string;
+  selectedEnemyTeamId: string;
+};
+
+const MAX_ACTION_HISTORY = 10;
+
 type MapBoardProps = {
   config: GameMapConfig;
   tiles: MapTilesById;
@@ -481,12 +493,8 @@ export default function GameMapPage() {
   const firstTileId = mapConfig.tiles[0]?.id ?? "";
   const boardRef = useRef<HTMLDivElement | null>(null);
   const hasLoadedStoredMap = useRef(false);
-  const latestStateRef = useRef<{
-    tiles: MapTilesById;
-    rivalTeams: RivalTeam[];
-    ourTeam: OurTeamConfig;
-    enemyTeams: EnemyTeam[];
-  } | null>(null);
+  const latestSnapshotRef = useRef<GameMapSnapshot | null>(null);
+  const undoStackRef = useRef<GameMapSnapshot[]>([]);
   const [tiles, setTiles] = useState<MapTilesById>(() => createEmptyMap(mapConfig));
   const [selectedMarker, setSelectedMarker] = useState<TileMarker>("base");
   const [selectedRivalColor, setSelectedRivalColor] = useState(initialRivalColors[0]);
@@ -497,15 +505,73 @@ export default function GameMapPage() {
   const [enemyTeams, setEnemyTeams] = useState<EnemyTeam[]>([]);
   const [selectedEnemyTeamId, setSelectedEnemyTeamId] = useState(initialEnemyIds[0]);
 
+  function getCurrentSnapshot(): GameMapSnapshot {
+    return latestSnapshotRef.current ?? {
+      tiles,
+      rivalTeams,
+      ourTeam,
+      enemyTeams,
+      selectedTileId,
+      selectedRivalColor,
+      selectedEnemyTeamId,
+    };
+  }
+
+  function applySnapshot(snapshot: GameMapSnapshot) {
+    latestSnapshotRef.current = snapshot;
+    setTiles(snapshot.tiles);
+    setRivalTeams(snapshot.rivalTeams);
+    setOurTeam(snapshot.ourTeam);
+    setEnemyTeams(snapshot.enemyTeams);
+    setSelectedTileId(snapshot.selectedTileId);
+    setSelectedRivalColor(snapshot.selectedRivalColor);
+    setSelectedEnemyTeamId(snapshot.selectedEnemyTeamId);
+  }
+
+  function snapshotsEqual(a: GameMapSnapshot, b: GameMapSnapshot) {
+    return (
+      a.tiles === b.tiles &&
+      a.rivalTeams === b.rivalTeams &&
+      a.ourTeam === b.ourTeam &&
+      a.enemyTeams === b.enemyTeams &&
+      a.selectedTileId === b.selectedTileId &&
+      a.selectedRivalColor === b.selectedRivalColor &&
+      a.selectedEnemyTeamId === b.selectedEnemyTeamId
+    );
+  }
+
+  function commitAction(updater: (current: GameMapSnapshot) => GameMapSnapshot) {
+    const current = getCurrentSnapshot();
+    const next = updater(current);
+    if (snapshotsEqual(current, next)) return;
+
+    applySnapshot(next);
+    undoStackRef.current = [current, ...undoStackRef.current].slice(0, MAX_ACTION_HISTORY);
+  }
+
+  function undoLastAction() {
+    const snapshotToRestore = undoStackRef.current[0];
+    if (!snapshotToRestore) return;
+
+    undoStackRef.current = undoStackRef.current.slice(1);
+    applySnapshot(snapshotToRestore);
+  }
+
   useEffect(() => {
     let isMounted = true;
 
     void loadStoredMap(mapConfig).then((storedMap) => {
       if (!isMounted) return;
-      setTiles(storedMap.tiles);
-      setRivalTeams(storedMap.rivalTeams.length > 0 ? storedMap.rivalTeams : normalizeRivalTeams(null));
-      setOurTeam(storedMap.ourTeam);
-      setEnemyTeams(storedMap.enemyTeams.length > 0 ? storedMap.enemyTeams : normalizeEnemyTeams(null));
+      applySnapshot({
+        tiles: storedMap.tiles,
+        rivalTeams: storedMap.rivalTeams.length > 0 ? storedMap.rivalTeams : normalizeRivalTeams(null),
+        ourTeam: storedMap.ourTeam,
+        enemyTeams: storedMap.enemyTeams.length > 0 ? storedMap.enemyTeams : normalizeEnemyTeams(null),
+        selectedTileId: firstTileId,
+        selectedRivalColor: initialRivalColors[0],
+        selectedEnemyTeamId: initialEnemyIds[0],
+      });
+      undoStackRef.current = [];
       hasLoadedStoredMap.current = true;
     });
 
@@ -515,8 +581,16 @@ export default function GameMapPage() {
   }, [mapConfig]);
 
   useEffect(() => {
-    latestStateRef.current = { tiles, rivalTeams, ourTeam, enemyTeams };
-  }, [tiles, rivalTeams, ourTeam, enemyTeams]);
+    latestSnapshotRef.current = {
+      tiles,
+      rivalTeams,
+      ourTeam,
+      enemyTeams,
+      selectedTileId,
+      selectedRivalColor,
+      selectedEnemyTeamId,
+    };
+  }, [tiles, rivalTeams, ourTeam, enemyTeams, selectedTileId, selectedRivalColor, selectedEnemyTeamId]);
 
   useEffect(() => {
     if (!hasLoadedStoredMap.current) return;
@@ -525,8 +599,8 @@ export default function GameMapPage() {
 
   useEffect(() => {
     const flushLatestState = () => {
-      if (!hasLoadedStoredMap.current || !latestStateRef.current) return;
-      const { tiles: latestTiles, rivalTeams: latestRivalTeams, ourTeam: latestOurTeam, enemyTeams: latestEnemyTeams } = latestStateRef.current;
+      if (!hasLoadedStoredMap.current || !latestSnapshotRef.current) return;
+      const { tiles: latestTiles, rivalTeams: latestRivalTeams, ourTeam: latestOurTeam, enemyTeams: latestEnemyTeams } = latestSnapshotRef.current;
       saveStoredMap(latestTiles, latestRivalTeams, latestOurTeam, latestEnemyTeams);
     };
 
@@ -547,6 +621,23 @@ export default function GameMapPage() {
     document.addEventListener("pointerdown", handlePointerDown);
     return () => {
       document.removeEventListener("pointerdown", handlePointerDown);
+    };
+  }, []);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key.toLowerCase() !== "z") return;
+      if (!event.metaKey && !event.ctrlKey) return;
+      if (event.shiftKey || event.altKey) return;
+      if (!latestSnapshotRef.current || undoStackRef.current.length === 0) return;
+
+      event.preventDefault();
+      undoLastAction();
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
     };
   }, []);
 
@@ -646,232 +737,252 @@ export default function GameMapPage() {
   }
 
   function updateTile(tileId: string, marker: TileMarker, rivalColor: string, enemyTeamId?: string) {
-    setSelectedTileId(tileId);
-    setTiles((currentTiles) =>
-      currentTiles[tileId]
-        ? {
-          ...currentTiles,
-          [tileId]: {
-            ...currentTiles[tileId],
-            marker,
-            rivalColor: marker === "rival" ? rivalColor : currentTiles[tileId].rivalColor,
-            enemyColor: marker === "enemy" ? (enemyTeamId ?? selectedEnemyTeamId) : currentTiles[tileId].enemyColor,
-          },
+    commitAction((current) => {
+        const currentTile = current.tiles[tileId];
+        if (!currentTile) return current;
+
+        const nextTile = {
+          ...currentTile,
+          marker,
+          rivalColor: marker === "rival" ? rivalColor : currentTile.rivalColor,
+          enemyColor: marker === "enemy" ? (enemyTeamId ?? current.selectedEnemyTeamId) : currentTile.enemyColor,
+        };
+
+        if (
+          currentTile.marker === nextTile.marker &&
+          currentTile.rivalColor === nextTile.rivalColor &&
+          currentTile.enemyColor === nextTile.enemyColor &&
+          current.selectedTileId === tileId
+        ) {
+          return current;
         }
-        : currentTiles
+
+        return {
+          ...current,
+          selectedTileId: tileId,
+          tiles: {
+            ...current.tiles,
+            [tileId]: nextTile,
+          },
+        };
+      }
     );
   }
 
 
   function resetMap() {
-    setTiles(createEmptyMap(mapConfig));
-    setSelectedTileId(firstTileId);
+    commitAction((current) => ({
+      ...current,
+      tiles: createEmptyMap(mapConfig),
+      selectedTileId: firstTileId,
+    }));
   }
 
   // Function to add a new rival team
   function addRival() {
-    const newColor = `#${Math.floor(Math.random()*16777215).toString(16)}`;
-    
-    // Ensure the color is in proper 6-digit hex format
-    const normalizedColor = newColor.startsWith('#') ? newColor : `#${newColor.replace(/^#/, '')}`;
-    
-    // Normalize to uppercase hex format for consistency
-    const finalColor = /^[#]?[0-9A-Fa-f]{6}$/.test(normalizedColor.replace('#', ''))
-      ? normalizedColor.toUpperCase()
-      : normalizedColor;
+    commitAction((current) => {
+      const newColor = `#${Math.floor(Math.random()*16777215).toString(16)}`;
+      const normalizedColor = newColor.startsWith("#") ? newColor : `#${newColor.replace(/^#/, "")}`;
+      const finalColor = /^[#]?[0-9A-Fa-f]{6}$/.test(normalizedColor.replace("#", ""))
+        ? normalizedColor.toUpperCase()
+        : normalizedColor;
+      const rivalAbbreviation = (current.rivalTeams.length < 9) ? `RV${current.rivalTeams.length + 1}` : `R${current.rivalTeams.length + 1}`;
+      const newTeam: RivalTeam = {
+        color: finalColor,
+        name: `Rival ${current.rivalTeams.length + 1}`,
+        code: rivalAbbreviation,
+      };
 
-    const rivalAbbreviation = (rivalTeams.length < 9) ? `RV${rivalTeams.length + 1}` : `R${rivalTeams.length + 1}`;
-
-    // Add new rival team to the list
-    const newTeam: RivalTeam = {
-      color: finalColor,
-      name: `Rival ${rivalTeams.length + 1}`,
-      code: rivalAbbreviation,
-    };
-    setRivalTeams(prev => [...prev, newTeam]);
-
-    // If the previous first color was selected, keep selection; otherwise select new
-    if (!rivalTeams.length || !rivalTeams.find(t => t.color === selectedRivalColor)) {
-      setSelectedRivalColor(finalColor);
-    } else if (rivalTeams.length > 0) {
-      setSelectedRivalColor(rivalTeams[0].color);
-    }
+      return {
+        ...current,
+        rivalTeams: [...current.rivalTeams, newTeam],
+        selectedRivalColor:
+          !current.rivalTeams.length || !current.rivalTeams.find((team) => team.color === current.selectedRivalColor)
+            ? finalColor
+            : current.rivalTeams[0]?.color ?? finalColor,
+      };
+    });
   }
 
   // Function to update a rival team color (Rival Teams can change color)
   function updateRivalColor(oldColor: string, newColor: string) {
-    // Convert to hex if needed (handle both #RGB and RGB formats)
-    let normalizedColor = newColor.startsWith('#') ? newColor : `#${newColor.replace(/^#/, '')}`;
-    
-    // Ensure it's a valid 6-digit hex color
-    if (!/^[#]?[0-9A-Fa-f]{6}$/.test(normalizedColor.replace('#', ''))) {
-      return; // Invalid color format
-    }
-    
-    // Normalize to uppercase hex format for consistency
-    normalizedColor = normalizedColor.toUpperCase();
-    
-    // Update the color in the team list
-    setRivalTeams(prev => 
-      prev.map(team => 
-        team.color === oldColor ? { ...team, color: normalizedColor } : team
-      )
-    );
+    commitAction((current) => {
+      let normalizedColor = newColor.startsWith("#") ? newColor : `#${newColor.replace(/^#/, "")}`;
+      if (!/^[#]?[0-9A-Fa-f]{6}$/.test(normalizedColor.replace("#", ""))) {
+        return current;
+      }
+      normalizedColor = normalizedColor.toUpperCase();
+      if (normalizedColor === oldColor) return current;
 
-    // Update tiles with the old color to use the new color
-    setTiles(prev => {
-      const newTiles = { ...prev };
-      Object.keys(newTiles).forEach(tileId => {
-        if (newTiles[tileId].rivalColor === oldColor) {
-          newTiles[tileId] = {
-            ...newTiles[tileId],
-            rivalColor: normalizedColor
+      const nextTiles = { ...current.tiles };
+      Object.keys(nextTiles).forEach((tileId) => {
+        if (nextTiles[tileId].rivalColor === oldColor) {
+          nextTiles[tileId] = {
+            ...nextTiles[tileId],
+            rivalColor: normalizedColor,
           };
         }
       });
-      return newTiles;
-    });
 
-    // If the old color was selected, switch to new color
-    if (selectedRivalColor === oldColor) {
-      setSelectedRivalColor(normalizedColor);
-    }
+      return {
+        ...current,
+        rivalTeams: current.rivalTeams.map((team) =>
+          team.color === oldColor ? { ...team, color: normalizedColor } : team
+        ),
+        tiles: nextTiles,
+        selectedRivalColor: current.selectedRivalColor === oldColor ? normalizedColor : current.selectedRivalColor,
+      };
+    });
   }
 
   // Function to update a rival team name (Rival Teams can edit name)
   function updateRivalName(oldColor: string, newName: string) {
-    setRivalTeams(prev =>
-      prev.map(team =>
+    commitAction((current) => ({
+      ...current,
+      rivalTeams: current.rivalTeams.map((team) =>
         team.color === oldColor ? { ...team, name: newName } : team
-      )
-    );
+      ),
+    }));
   }
 
   // Function to update a rival team code (Rival Teams can edit code)
   function updateRivalCode(oldColor: string, newCode: string) {
     const normalized = newCode.substring(0, 3).toUpperCase().replace(/[^A-Z]/g, "");
-    setRivalTeams(prev =>
-      prev.map(team =>
+    commitAction((current) => ({
+      ...current,
+      rivalTeams: current.rivalTeams.map((team) =>
         team.color === oldColor ? { ...team, code: normalized || "R" } : team
-      )
-    );
+      ),
+    }));
   }
 
   // Function to remove a rival team (Rival Teams can be removed)
   function removeRival(color: string) {
-    if (rivalTeams.length <= 1) return; // Prevent removing the last rival
+    commitAction((current) => {
+      if (current.rivalTeams.length <= 1) return current;
 
-    // Remove team from the list
-    const newRivalTeams = rivalTeams.filter(t => t.color !== color);
-    setRivalTeams(newRivalTeams);
-
-    // Clear tiles assigned to the removed rival team
-    setTiles(prev => {
-      const newTiles = { ...prev };
-      Object.keys(newTiles).forEach(tileId => {
-        if (newTiles[tileId].marker === "rival" && newTiles[tileId].rivalColor === color) {
-          newTiles[tileId] = {
-            ...newTiles[tileId],
-            marker: "none"
+      const newRivalTeams = current.rivalTeams.filter((team) => team.color !== color);
+      const nextTiles = { ...current.tiles };
+      Object.keys(nextTiles).forEach((tileId) => {
+        if (nextTiles[tileId].marker === "rival" && nextTiles[tileId].rivalColor === color) {
+          nextTiles[tileId] = {
+            ...nextTiles[tileId],
+            marker: "none",
           };
         }
       });
-      return newTiles;
-    });
 
-    const fallbackColor = newRivalTeams[0]?.color || initialRivalColors[0];
-    if (selectedRivalColor === color) {
-      setSelectedRivalColor(fallbackColor);
-    }
+      const fallbackColor = newRivalTeams[0]?.color || initialRivalColors[0];
+      return {
+        ...current,
+        rivalTeams: newRivalTeams,
+        tiles: nextTiles,
+        selectedRivalColor: current.selectedRivalColor === color ? fallbackColor : current.selectedRivalColor,
+      };
+    });
   }
 
   // Our Team management functions (Our Team can change name, code, and color)
   function updateOurTeamName(newName: string) {
-    setOurTeam(prev => ({ ...prev, name: newName }));
+    commitAction((current) => ({
+      ...current,
+      ourTeam: { ...current.ourTeam, name: newName },
+    }));
   }
 
   function updateOurTeamCode(newCode: string) {
     const normalized = newCode.substring(0, 3).toUpperCase().replace(/[^A-Z]/g, "");
-    setOurTeam(prev => ({ ...prev, code: normalized || "OUR" }));
+    commitAction((current) => ({
+      ...current,
+      ourTeam: { ...current.ourTeam, code: normalized || "OUR" },
+    }));
   }
 
   function updateOurTeamColor(newColor: string) {
-    let normalizedColor = newColor.startsWith('#') ? newColor : `#${newColor.replace(/^#/, '')}`;
-    
-    if (!/^[#]?[0-9A-Fa-f]{6}$/.test(normalizedColor.replace('#', ''))) {
-      return; // Invalid color format
-    }
-    
-    normalizedColor = normalizedColor.toUpperCase();
+    commitAction((current) => {
+      let normalizedColor = newColor.startsWith("#") ? newColor : `#${newColor.replace(/^#/, "")}`;
+      if (!/^[#]?[0-9A-Fa-f]{6}$/.test(normalizedColor.replace("#", ""))) {
+        return current;
+      }
+      normalizedColor = normalizedColor.toUpperCase();
+      if (normalizedColor === current.ourTeam.color) return current;
 
-    // Update all base tiles to use the new color
-    setTiles(prev => {
-      const newTiles = { ...prev };
-      // Find any tiles with the old ourTeam color and update them
-      Object.keys(newTiles).forEach(tileId => {
-        if (newTiles[tileId].rivalColor === ourTeam.color) {
-          newTiles[tileId] = {
-            ...newTiles[tileId],
-            rivalColor: normalizedColor
+      const nextTiles = { ...current.tiles };
+      Object.keys(nextTiles).forEach((tileId) => {
+        if (nextTiles[tileId].rivalColor === current.ourTeam.color) {
+          nextTiles[tileId] = {
+            ...nextTiles[tileId],
+            rivalColor: normalizedColor,
           };
         }
       });
-      return newTiles;
-    });
 
-    // Update the team color
-    setOurTeam(prev => ({ ...prev, color: normalizedColor }));
+      return {
+        ...current,
+        tiles: nextTiles,
+        ourTeam: { ...current.ourTeam, color: normalizedColor },
+      };
+    });
   }
 
   function addEnemy() {
-    const newTeam: EnemyTeam = {
-      id: `enemy-${crypto.randomUUID()}`,
-      name: `Enemy ${enemyTeams.length + 1}`,
-      code: generateRandomCode(),
-    };
-    setEnemyTeams(prev => [...prev, newTeam]);
-    setSelectedEnemyTeamId(newTeam.id);
+    commitAction((current) => {
+      const newTeam: EnemyTeam = {
+        id: `enemy-${crypto.randomUUID()}`,
+        name: `Enemy ${current.enemyTeams.length + 1}`,
+        code: generateRandomCode(),
+      };
+
+      return {
+        ...current,
+        enemyTeams: [...current.enemyTeams, newTeam],
+        selectedEnemyTeamId: newTeam.id,
+      };
+    });
   }
 
   function removeEnemy(id: string) {
-    if (enemyTeams.length <= 1) return;
+    commitAction((current) => {
+      if (current.enemyTeams.length <= 1) return current;
 
-    const newEnemyTeams = enemyTeams.filter(t => t.id !== id);
-    setEnemyTeams(newEnemyTeams);
-
-    setTiles(prev => {
-      const newTiles = { ...prev };
-      Object.keys(newTiles).forEach(tileId => {
-        if (newTiles[tileId].marker === "enemy" && newTiles[tileId].enemyColor === id) {
-          newTiles[tileId] = {
-            ...newTiles[tileId],
-            marker: "none"
+      const newEnemyTeams = current.enemyTeams.filter((team) => team.id !== id);
+      const nextTiles = { ...current.tiles };
+      Object.keys(nextTiles).forEach((tileId) => {
+        if (nextTiles[tileId].marker === "enemy" && nextTiles[tileId].enemyColor === id) {
+          nextTiles[tileId] = {
+            ...nextTiles[tileId],
+            marker: "none",
           };
         }
       });
-      return newTiles;
-    });
 
-    if (selectedEnemyTeamId === id) {
-      setSelectedEnemyTeamId(newEnemyTeams[0]?.id || initialEnemyIds[0]);
-    }
+      return {
+        ...current,
+        enemyTeams: newEnemyTeams,
+        tiles: nextTiles,
+        selectedEnemyTeamId:
+          current.selectedEnemyTeamId === id ? (newEnemyTeams[0]?.id || initialEnemyIds[0]) : current.selectedEnemyTeamId,
+      };
+    });
   }
 
   function updateEnemyName(id: string, name: string) {
-    setEnemyTeams(prev =>
-      prev.map(team =>
+    commitAction((current) => ({
+      ...current,
+      enemyTeams: current.enemyTeams.map((team) =>
         team.id === id ? { ...team, name } : team
-      )
-    );
+      ),
+    }));
   }
 
   function updateEnemyCode(id: string, code: string) {
     const normalized = code.substring(0, 3).toUpperCase().replace(/[^A-Z]/g, "");
-    setEnemyTeams(prev =>
-      prev.map(team =>
+    commitAction((current) => ({
+      ...current,
+      enemyTeams: current.enemyTeams.map((team) =>
         team.id === id ? { ...team, code: normalized || "XXX" } : team
-      )
-    );
+      ),
+    }));
   }
 
   return (
