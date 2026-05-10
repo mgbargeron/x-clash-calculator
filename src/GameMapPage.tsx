@@ -124,6 +124,36 @@ function formatTeamDisplayLabel(code: string, name: string): string {
   return `[${normalizedCode}]${normalizedName}`;
 }
 
+function LockIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path
+        d="M7 10V8a5 5 0 1 1 10 0v2M6 10h12a1 1 0 0 1 1 1v8a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-8a1 1 0 0 1 1-1Z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function UnlockIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path
+        d="M18 10h1a1 1 0 0 1 1 1v8a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2v-8a1 1 0 0 1 1-1h8M10 10V8a5 5 0 0 1 9.8-1.5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 type MapTilesById = Record<string, MapTile>;
 
 type MarkerPointSummary = {
@@ -139,6 +169,7 @@ type MapBoardProps = {
   selectedMarker: TileMarker;
   selectedRivalColor: string;
   selectedEnemyTeamId: string;
+  boardRef: React.RefObject<HTMLDivElement | null>;
   onSelectTile: (tileId: string) => void;
   onPaintTile: (tileId: string, marker: TileMarker, rivalColor: string, enemyTeamId?: string) => void;
 };
@@ -371,6 +402,7 @@ function MapBoard({
   selectedMarker,
   selectedRivalColor,
   selectedEnemyTeamId,
+  boardRef,
   onSelectTile,
   onPaintTile,
 }: MapBoardProps) {
@@ -381,6 +413,7 @@ function MapBoard({
 
   return (
     <div
+      ref={boardRef}
       className="map-board-frame"
       style={
         {
@@ -446,6 +479,7 @@ function MapBoard({
 export default function GameMapPage() {
   const mapConfig = defaultGameMapConfig;
   const firstTileId = mapConfig.tiles[0]?.id ?? "";
+  const boardRef = useRef<HTMLDivElement | null>(null);
   const hasLoadedStoredMap = useRef(false);
   const latestStateRef = useRef<{
     tiles: MapTilesById;
@@ -457,6 +491,7 @@ export default function GameMapPage() {
   const [selectedMarker, setSelectedMarker] = useState<TileMarker>("base");
   const [selectedRivalColor, setSelectedRivalColor] = useState(initialRivalColors[0]);
   const [selectedTileId, setSelectedTileId] = useState(firstTileId);
+  const [teamManagementLocked, setTeamManagementLocked] = useState(false);
   const [rivalTeams, setRivalTeams] = useState<RivalTeam[]>([]);
   const [ourTeam, setOurTeam] = useState<OurTeamConfig>({ color: "#45b66b", name: "Our Team", code: "OUR" });
   const [enemyTeams, setEnemyTeams] = useState<EnemyTeam[]>([]);
@@ -499,6 +534,19 @@ export default function GameMapPage() {
     return () => {
       flushLatestState();
       window.removeEventListener("beforeunload", flushLatestState);
+    };
+  }, []);
+
+  useEffect(() => {
+    const handlePointerDown = (event: PointerEvent) => {
+      if (!boardRef.current) return;
+      if (boardRef.current.contains(event.target as Node)) return;
+      setSelectedTileId("");
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
     };
   }, []);
 
@@ -833,9 +881,6 @@ export default function GameMapPage() {
           <p className="eyebrow">Planning board</p>
           <h1>Game Map</h1>
         </div>
-        <button className="secondary-button" type="button" onClick={resetMap}>
-          Reset
-        </button>
       </div>
 
       <div className="map-toolbar" aria-label="Map tile tools">
@@ -916,12 +961,34 @@ export default function GameMapPage() {
             selectedMarker={selectedMarker}
             selectedRivalColor={selectedRivalColor}
             selectedEnemyTeamId={selectedEnemyTeamId}
+            boardRef={boardRef}
             onSelectTile={setSelectedTileId}
             onPaintTile={updateTile}
           />
         </div>
 
         <aside className="map-score-panel" aria-label="Map score summary">
+          <div className="aside-controls">
+            <button
+              className={`secondary-button aside-control-button lock-button ${teamManagementLocked ? "active" : ""}`}
+              type="button"
+              onClick={() => setTeamManagementLocked((locked) => !locked)}
+              aria-pressed={teamManagementLocked}
+              title={teamManagementLocked ? "Unlock team add/remove and reset" : "Lock team add/remove and reset"}
+              aria-label={teamManagementLocked ? "Unlock team add/remove and reset" : "Lock team add/remove and reset"}
+            >
+              {teamManagementLocked ? <LockIcon /> : <UnlockIcon />}
+            </button>
+            <button
+              className="secondary-button aside-control-button reset-button"
+              type="button"
+              onClick={resetMap}
+              disabled={teamManagementLocked}
+            >
+              Clear Board
+            </button>
+          </div>
+
           {/* Our Team - can edit name, code, and color */}
           <div className="score-group-label">
             <span>Our Team</span>
@@ -939,6 +1006,7 @@ export default function GameMapPage() {
                 className="enemy-code-input"
                 value={ourTeam.code}
                 maxLength={3}
+                disabled={teamManagementLocked}
                 onChange={(event) => updateOurTeamCode(event.target.value)}
                 title={`Change code for ${ourTeam.name}`}
               />
@@ -947,12 +1015,14 @@ export default function GameMapPage() {
                 aria-label={`${ourTeam.name} name`}
                 value={ourTeam.name}
                 maxLength={16}
+                disabled={teamManagementLocked}
                 onChange={(event) => updateOurTeamName(event.target.value)}
               />
               <input
                 type="color"
                 className="rival-color-picker"
                 value={ourTeam.color}
+                disabled={teamManagementLocked}
                 onChange={(e) => updateOurTeamColor(e.target.value)}
                 title={`Change color for ${ourTeam.name}`}
               />
@@ -964,63 +1034,13 @@ export default function GameMapPage() {
               title={`Remove ${ourTeam.name}`}
               aria-label={`Remove ${ourTeam.name}`}
               onClick={() => removeRival(ourTeam.color)}
-              disabled={rivalTeams.length <= 1}
+              disabled={teamManagementLocked || rivalTeams.length <= 1}
             >
               ×
             </button>
           </div>
 
-          {/* Enemy teams - can only edit name and code (no color picker) */}
-          <div className="score-group-label">
-            <span>Enemy Teams</span>
-            <button
-              className="aside-add-button"
-              type="button"
-              title="Add New Enemy Team"
-              aria-label="Add New Enemy Team"
-              onClick={addEnemy}
-            >
-              +
-            </button>
-          </div>
 
-          {enemyTeams.map((team) => (
-            <div
-              className="score-row enemy-team"
-              key={team.id}
-              style={{ "--score-color": ENEMY_COLOR } as CSSProperties}
-            >
-              <span className="score-color" aria-hidden="true" />
-              <div className="rival-input-container">
-                <input
-                  type="text"
-                  className="enemy-code-input"
-                  value={team.code}
-                  maxLength={3}
-                  onChange={(event) => updateEnemyCode(team.id, event.target.value)}
-                  title={`Change code for ${team.name}`}
-                />
-                <input
-                  className="team-name-input"
-                  aria-label={`${team.name} name`}
-                  value={team.name}
-                  maxLength={16}
-                  onChange={(event) => updateEnemyName(team.id, event.target.value)}
-                />
-              </div>
-              {renderPointSummary(enemyPointSummary[team.id])}
-              <button
-                className="remove-team-button"
-                type="button"
-                title={`Remove ${team.name}`}
-                aria-label={`Remove ${team.name}`}
-                onClick={() => removeEnemy(team.id)}
-                disabled={enemyTeams.length <= 1}
-              >
-                ×
-              </button>
-            </div>
-          ))}
 
           {/* Rival teams - can edit name, code, and color */}
           <div className="score-group-label">
@@ -1031,6 +1051,7 @@ export default function GameMapPage() {
               title="Add New Rival Team"
               aria-label="Add New Rival Team"
               onClick={addRival}
+              disabled={teamManagementLocked}
             >
               +
             </button>
@@ -1049,6 +1070,7 @@ export default function GameMapPage() {
                   className="enemy-code-input"
                   value={team.code}
                   maxLength={3}
+                  disabled={teamManagementLocked}
                   onChange={(event) => updateRivalCode(team.color, event.target.value)}
                   title={`Change code for ${team.name}`}
                 />
@@ -1057,12 +1079,14 @@ export default function GameMapPage() {
                   aria-label={`${team.name} name`}
                   value={team.name}
                   maxLength={16}
+                  disabled={teamManagementLocked}
                   onChange={(event) => updateRivalName(team.color, event.target.value)}
                 />
                 <input
                   type="color"
                   className="rival-color-picker"
                   value={team.color}
+                  disabled={teamManagementLocked}
                   onChange={(e) => updateRivalColor(team.color, e.target.value)}
                   title={`Change color for ${team.name}`}
                 />
@@ -1074,7 +1098,62 @@ export default function GameMapPage() {
                 title={`Remove ${team.name}`}
                 aria-label={`Remove ${team.name}`}
                 onClick={() => removeRival(team.color)}
-                disabled={rivalTeams.length <= 1}
+                disabled={teamManagementLocked || rivalTeams.length <= 1}
+              >
+                ×
+              </button>
+            </div>
+          ))}
+
+          {/* Enemy teams - can only edit name and code (no color picker) */}
+          <div className="score-group-label">
+            <span>Enemy Teams</span>
+            <button
+              className="aside-add-button"
+              type="button"
+              title="Add New Enemy Team"
+              aria-label="Add New Enemy Team"
+              onClick={addEnemy}
+              disabled={teamManagementLocked}
+            >
+              +
+            </button>
+          </div>
+
+          {enemyTeams.map((team) => (
+            <div
+              className="score-row enemy-team"
+              key={team.id}
+              style={{ "--score-color": ENEMY_COLOR } as CSSProperties}
+            >
+              <span className="score-color" aria-hidden="true" />
+              <div className="rival-input-container">
+                <input
+                  type="text"
+                  className="enemy-code-input"
+                  value={team.code}
+                  maxLength={3}
+                  disabled={teamManagementLocked}
+                  onChange={(event) => updateEnemyCode(team.id, event.target.value)}
+                  title={`Change code for ${team.name}`}
+                />
+                <input
+                  className="team-name-input"
+                  aria-label={`${team.name} name`}
+                  value={team.name}
+                  maxLength={16}
+                  disabled={teamManagementLocked}
+                  onChange={(event) => updateEnemyName(team.id, event.target.value)}
+                />
+              </div>
+              {renderPointSummary(enemyPointSummary[team.id])}
+              <button
+                className="remove-team-button"
+                type="button"
+                title={`Remove ${team.name}`}
+                aria-label={`Remove ${team.name}`}
+                onClick={() => removeEnemy(team.id)}
+                disabled={teamManagementLocked || enemyTeams.length <= 1}
               >
                 ×
               </button>
