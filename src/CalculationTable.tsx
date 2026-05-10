@@ -84,6 +84,15 @@ const CalculationTable = ({
     return desired.minus(grandTotal.plus(current));
   }, [desiredTotal, currentAmount, grandTotal]);
 
+  const formattedRemainingAmount = useMemo(() => {
+    if (remainingAmount.eq(0)) {
+      return formatWholeDecimal(remainingAmount);
+    }
+
+    const prefix = remainingAmount.lt(0) ? "+" : "-";
+    return `${prefix}${formatWholeDecimal(remainingAmount.abs())}`;
+  }, [remainingAmount]);
+
   function updateRow(index: number, field: keyof Row, nextValue: string) {
     const sanitizedValue =
       field === "value" || field === "quantity"
@@ -176,7 +185,7 @@ const CalculationTable = ({
       </div>
       <div className="grand-total">
         <span>Remaining Amount</span>
-        <strong style={{  color: remainingAmountColor }}>{formatWholeDecimal(remainingAmount)}</strong>
+        <strong style={{ color: remainingAmountColor }}>{formattedRemainingAmount}</strong>
       </div>
     </>
   );
