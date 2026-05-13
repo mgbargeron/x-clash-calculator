@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
 import type { ReactNode } from "react";
 
 import type { TileMarker, MapTile, OurTeamConfig, RivalTeam, EnemyTeam } from "../components/gameMap/types";
@@ -200,41 +200,44 @@ export default function GameMapPage({ navigation }: GameMapPageProps) {
     saveStoredMap(tiles, rivalTeams, ourTeam, enemyTeams);
   }, [tiles, rivalTeams, ourTeam, enemyTeams]);
 
-  // Flush on unload
-  useEffect(() => {
-    const flushLatestState = () => {
-      if (!hasLoadedStoredMap.current || !latestSnapshotRef.current) return;
-      saveStoredMap(latestSnapshotRef.current.tiles, latestSnapshotRef.current.rivalTeams, latestSnapshotRef.current.ourTeam, latestSnapshotRef.current.enemyTeams);
-    };
-    window.addEventListener("beforeunload", flushLatestState);
-    return () => { flushLatestState(); window.removeEventListener("beforeunload", flushLatestState); };
-  }, []);
+  // Flush on unload (useEffectEvent for stable callback reference)
+  const flushLatestState = useEffectEvent(() => {
+    if (!hasLoadedStoredMap.current || !latestSnapshotRef.current) return;
+    saveStoredMap(latestSnapshotRef.current.tiles, latestSnapshotRef.current.rivalTeams, latestSnapshotRef.current.ourTeam, latestSnapshotRef.current.enemyTeams);
+  });
 
-  // Deselect on pointer down outside board
   useEffect(() => {
-    const handlePointerDown = (event: PointerEvent) => {
-      if (!boardRef.current) return;
-      if (boardRef.current.contains(event.target as Node)) return;
-      setSelectedTileId("");
-    };
+    window.addEventListener("beforeunload", flushLatestState);
+    return () => { window.removeEventListener("beforeunload", flushLatestState); };
+  }, [flushLatestState]);
+
+  // Deselect on pointer down outside board (useEffectEvent for stable callback)
+  const handlePointerDown = useEffectEvent((event: PointerEvent) => {
+    if (!boardRef.current) return;
+    if (boardRef.current.contains(event.target as Node)) return;
+    setSelectedTileId("");
+  });
+
+  useEffect(() => {
     document.addEventListener("pointerdown", handlePointerDown);
     return () => { document.removeEventListener("pointerdown", handlePointerDown); };
-  }, []);
+  }, [handlePointerDown]);
 
-  // Undo keyboard shortcut (Cmd/Ctrl+Z)
+  // Undo keyboard shortcut (Cmd/Ctrl+Z) - useEffectEvent for stable callback reference
+  const handleKeyDown = useEffectEvent((event: KeyboardEvent) => {
+    if (event.key.toLowerCase() !== "z") return;
+    if (!event.metaKey && !event.ctrlKey) return;
+    if (event.shiftKey || event.altKey) return;
+    if (!latestSnapshotRef.current || undoStackRef.current.length === 0) return;
+
+    event.preventDefault();
+    undoLastAction();
+  });
+
   useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key.toLowerCase() !== "z") return;
-      if (!event.metaKey && !event.ctrlKey) return;
-      if (event.shiftKey || event.altKey) return;
-      if (!latestSnapshotRef.current || undoStackRef.current.length === 0) return;
-
-      event.preventDefault();
-      undoLastAction();
-    };
     window.addEventListener("keydown", handleKeyDown);
     return () => { window.removeEventListener("keydown", handleKeyDown); };
-  }, []);
+  }, [handleKeyDown]);
 
   // Point summaries (extracted to hook)
   const { clearMarkerCount } = usePointSummaries({ mapConfig, tiles, rivalTeams, enemyTeams });

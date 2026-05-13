@@ -1,4 +1,4 @@
-import {useEffect, useState} from "react";
+import {useState} from "react";
 import {sanitizeNumericInput} from "./utils/sanatizeNumericInput";
 import CalculatorPage from "./pages/CalculatorPage";
 import HeroExpPage from "./pages/HeroExpPage";
@@ -41,10 +41,6 @@ function loadInitialGridValues(): string[][] {
 export default function App() {
   const [page, setPage] = useState<Page>("calculator");
   const [gridValues, setGridValues] = useState<string[][]>(() => loadInitialGridValues());
-
-  useEffect(() => {
-    window.localStorage.setItem(GRID_STORAGE_KEY, JSON.stringify(gridValues));
-  }, [gridValues]);
 
   const updateGridCell = (rowIndex: number, columnIndex: number, value: string) => {
     const sanitized = sanitizeNumericInput(value);

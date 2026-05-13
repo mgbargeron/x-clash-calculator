@@ -1,11 +1,12 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import Decimal from "decimal.js";
 import type { Row } from "./types";
 import { sanitizeNumericInput } from "./utils/sanatizeNumericInput";
 import { toDecimal } from "./utils/toDecimal";
 import { formatInputValue } from "./utils/formatInputValue";
 import { formatWholeDecimal } from "./utils/formatWholeDecimal";
-import { loadRows } from "./utils/loadRows";
+import { useLocalStorage } from "./hooks/useLocalStorage";
+import { useInitialRowsSync } from "./hooks/useInitialRowsSync";
 
 type CalculationTableProps = {
   initialRows: Row[];
@@ -18,50 +19,13 @@ const CalculationTable = ({
   resourceName,
   storageKey,
 }: CalculationTableProps) => {
-  const [rows, setRows] = useState<Row[]>(loadRows(initialRows, storageKey));
-  const [desiredTotal, setDesiredTotal] = useState<string>(() => {
-    const saved = window.localStorage.getItem(`${storageKey}-desired-total`);
-    return saved ?? "";
-  });
-  const [currentAmount, setCurrentAmount] = useState<string>(() => {
-    const saved = window.localStorage.getItem(`${storageKey}-current-amount`);
-    return saved ?? "";
-  });
+  // useInitialRowsSync handles: initial loading, row sync with props, and localStorage persistence
+  const { rows, setRows } = useInitialRowsSync({ initialRows, storageKey });
 
-  useEffect(() => {
-    setRows((currentRows) =>
-      currentRows.map((row, index) => {
-        const incoming = initialRows[index];
-        if (!incoming || !row.isStatic) {
-          return row;
-        }
-        return {
-          ...row,
-          value: incoming.value,
-          isStatic: true,
-        };
-      })
-    );
-  }, [initialRows]);
-
-  useEffect(() => {
-    window.localStorage.setItem(storageKey, JSON.stringify(rows));
-  }, [rows, storageKey]);
-
-  useEffect(() => {
-    const savedDesired = window.localStorage.getItem(`${storageKey}-desired-total`);
-    const savedCurrent = window.localStorage.getItem(`${storageKey}-current-amount`);
-    if (savedDesired !== null) setDesiredTotal(savedDesired);
-    if (savedCurrent !== null) setCurrentAmount(savedCurrent);
-  }, [storageKey]);
-
-  useEffect(() => {
-    window.localStorage.setItem(`${storageKey}-desired-total`, desiredTotal);
-  }, [desiredTotal, storageKey]);
-
-  useEffect(() => {
-    window.localStorage.setItem(`${storageKey}-current-amount`, currentAmount);
-  }, [currentAmount, storageKey]);
+  // useLocalStorage handles: loading and persisting desired total
+  const [desiredTotal, setDesiredTotal] = useLocalStorage<string>(`${storageKey}-desired-total`, "");
+  // useLocalStorage handles: loading and persisting current amount
+  const [currentAmount, setCurrentAmount] = useLocalStorage<string>(`${storageKey}-current-amount`, "");
 
   const rowTotals = useMemo(
     () =>

@@ -1,11 +1,13 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import Decimal from "decimal.js";
 import type { Row } from "./types";
 import { formatInputValue } from "./utils/formatInputValue";
 import { formatWholeDecimal } from "./utils/formatWholeDecimal";
-import { loadRows } from "./utils/loadRows";
 import { sanitizeNumericInput } from "./utils/sanatizeNumericInput";
 import { toDecimal } from "./utils/toDecimal";
+import { useLocalStorage } from "./hooks/useLocalStorage";
+import { useInitialRowsSync } from "./hooks/useInitialRowsSync";
+import { useScrollToElement } from "./hooks/useScrollToElement";
 
 type HeroExpCalculatorProps = {
   chestValues: string[];
@@ -207,7 +209,6 @@ export default function HeroExpCalculator({
 }: HeroExpCalculatorProps) {
   const levelListRef = useRef<HTMLDivElement | null>(null);
   const currentLevelRef = useRef<HTMLDivElement | null>(null);
-  const lastScrolledLevelRef = useRef<number | null>(null);
 
   const initialRows = useMemo<Row[]>(
     () => [
@@ -218,40 +219,22 @@ export default function HeroExpCalculator({
     [chestValues]
   );
 
-  const [rows, setRows] = useState<Row[]>(loadRows(initialRows, storageKey));
-  const [startLevel, setStartLevel] = useState<number>(() => {
-    const saved = window.localStorage.getItem(`${storageKey}${START_LEVEL_STORAGE_SUFFIX}`);
-    const parsed = Number(saved);
-    return Number.isFinite(parsed) ? clampLevel(parsed) : 1;
-  });
+  // useInitialRowsSync handles: initial loading, row sync with props, and localStorage persistence
+  const { rows, setRows } = useInitialRowsSync({ initialRows, storageKey });
 
+  // useLocalStorage handles: loading and persisting start level
+  const [startLevel, setStartLevel] = useLocalStorage<number>(`${storageKey}${START_LEVEL_STORAGE_SUFFIX}`, 1);
+
+  // Handle clamp on load
   useEffect(() => {
-    setRows((currentRows) =>
-      currentRows.map((row, index) => {
-        const incoming = initialRows[index];
-        if (!incoming || !row.isStatic) {
-          return row;
-        }
+    if (!Number.isFinite(startLevel)) {
+      setStartLevel(clampLevel(1));
+    } else if (startLevel < 1 || startLevel > MAX_HERO_LEVEL) {
+      setStartLevel(clampLevel(startLevel));
+    }
+  }, [startLevel, setStartLevel]);
 
-        return {
-          ...row,
-          value: incoming.value,
-          isStatic: true,
-        };
-      })
-    );
-  }, [initialRows]);
-
-  useEffect(() => {
-    window.localStorage.setItem(storageKey, JSON.stringify(rows));
-  }, [rows, storageKey]);
-
-  useEffect(() => {
-    window.localStorage.setItem(
-      `${storageKey}${START_LEVEL_STORAGE_SUFFIX}`,
-      String(startLevel)
-    );
-  }, [startLevel, storageKey]);
+  // useScrollToElement handles: scrolling to current level element (moved after progression is defined)
 
   const rowTotals = useMemo(
     () =>
@@ -308,6 +291,9 @@ export default function HeroExpCalculator({
       expStillNeededToMax: Decimal.max(expToMax.minus(totalExp), new Decimal(0)),
     };
   }, [startLevel, totalExp]);
+
+  // useScrollToElement handles: scrolling to current level element
+  useScrollToElement({ listRef: levelListRef, targetRef: currentLevelRef, triggerId: [progression.achievedLevel, startLevel] });
 
   const chestRequirements = useMemo(
     () =>
@@ -374,26 +360,6 @@ export default function HeroExpCalculator({
       })),
     [progression.achievedLevel, progression.nextLevel, progression.remainingExp, startLevel]
   );
-
-  useEffect(() => {
-    const listElement = levelListRef.current;
-    const currentElement = currentLevelRef.current;
-
-    if (!listElement || !currentElement) {
-      return;
-    }
-
-    if (lastScrolledLevelRef.current === progression.achievedLevel) {
-      return;
-    }
-
-    currentElement.scrollIntoView({
-      block: "start",
-      inline: "nearest",
-      behavior: "smooth",
-    });
-    lastScrolledLevelRef.current = progression.achievedLevel;
-  }, [progression.achievedLevel, startLevel]);
 
   function updateRow(index: number, nextValue: string) {
     const sanitizedValue = sanitizeNumericInput(nextValue);
