@@ -2,8 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import {
   defaultGameMapConfig,
-} from "./utils/gameMapConfig";
-import type { GameMapConfig, GameMapTileConfig } from "./utils/gameMapConfig";
+} from "../utils/gameMapConfig";
+import type { GameMapConfig, GameMapTileConfig } from "../utils/gameMapConfig";
 
 type TileMarker = "none" | "base" | "enemy" | "rival";
 

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import Decimal from "decimal.js";
-import { Row } from "./App";
+import type { Row } from "./types";
 import { sanitizeNumericInput } from "./utils/sanatizeNumericInput";
 import { toDecimal } from "./utils/toDecimal";
 import { formatInputValue } from "./utils/formatInputValue";

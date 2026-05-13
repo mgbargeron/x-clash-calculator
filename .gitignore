@@ -20,3 +20,4 @@ yarn-error.log*
 /.idea/x-clash-calculator.iml
 /.idea/
 /opencode.json
+/AGENTS.md
