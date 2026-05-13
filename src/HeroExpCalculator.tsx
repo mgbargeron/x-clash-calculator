@@ -591,6 +591,40 @@ export default function HeroExpCalculator({
         <section className="hero-surface hero-exp-sidebar-panel">
           <div className="hero-section-heading hero-section-heading-tight">
             <div>
+              <p className="hero-section-label">Level path</p>
+              <h2>Start to max</h2>
+            </div>
+            <div className="hero-level-legend" aria-label="Level state legend">
+              <span className="hero-level-legend-item">
+                <span className="hero-level-legend-dot hero-level-legend-dot-current" />
+                Current
+              </span>
+              <span className="hero-level-legend-item">
+                <span className="hero-level-legend-dot hero-level-legend-dot-next" />
+                Next
+              </span>
+            </div>
+          </div>
+
+          <div className="hero-level-list" ref={levelListRef}>
+            {visibleLevels.map(({ level, expRequired, state }) => (
+              <div
+                className={`hero-level-pill hero-level-${state}`}
+                key={level}
+                ref={state === "current" ? currentLevelRef : null}
+              >
+                <span className="hero-level-label">Level {level}</span>
+                <strong className="hero-level-exp">
+                  {expRequired ? `${formatWholeDecimal(expRequired)} EXP` : "Maxed"}
+                </strong>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="hero-surface hero-exp-sidebar-panel">
+          <div className="hero-section-heading hero-section-heading-tight">
+            <div>
               <p className="hero-section-label">Summary</p>
               <h2>Progress snapshot</h2>
             </div>
@@ -631,39 +665,6 @@ export default function HeroExpCalculator({
           </div>
         </section>
 
-        <section className="hero-surface hero-exp-sidebar-panel">
-          <div className="hero-section-heading hero-section-heading-tight">
-            <div>
-              <p className="hero-section-label">Level path</p>
-              <h2>Start to max</h2>
-            </div>
-            <div className="hero-level-legend" aria-label="Level state legend">
-              <span className="hero-level-legend-item">
-                <span className="hero-level-legend-dot hero-level-legend-dot-current" />
-                Current
-              </span>
-              <span className="hero-level-legend-item">
-                <span className="hero-level-legend-dot hero-level-legend-dot-next" />
-                Next
-              </span>
-            </div>
-          </div>
-
-          <div className="hero-level-list" ref={levelListRef}>
-            {visibleLevels.map(({ level, expRequired, state }) => (
-              <div
-                className={`hero-level-pill hero-level-${state}`}
-                key={level}
-                ref={state === "current" ? currentLevelRef : null}
-              >
-                <span className="hero-level-label">Level {level}</span>
-                <strong className="hero-level-exp">
-                  {expRequired ? `${formatWholeDecimal(expRequired)} EXP` : "Maxed"}
-                </strong>
-              </div>
-            ))}
-          </div>
-        </section>
       </aside>
     </div>
   );
