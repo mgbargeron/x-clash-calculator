@@ -1,4 +1,4 @@
-import {useState} from "react";
+import {useEffect, useState} from "react";
 import {sanitizeNumericInput} from "./utils/sanatizeNumericInput";
 import CalculatorPage from "./pages/CalculatorPage";
 import HeroExpPage from "./pages/HeroExpPage";
@@ -52,6 +52,10 @@ export default function App() {
       )
     );
   };
+
+  useEffect(() => {
+    localStorage.setItem(GRID_STORAGE_KEY, JSON.stringify(gridValues));
+  }, [gridValues]);
 
   const navigation = (
     <nav className="app-nav" aria-label="Primary navigation">
