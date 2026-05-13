@@ -25,7 +25,6 @@ type ScorePanelProps = {
   updateEnemyName: (id: string, value: string) => void;
   removeEnemy: (id: string) => void;
 };
-
 const ENEMY_COLOR = "#CF3F45";
 
 export function ScorePanel({

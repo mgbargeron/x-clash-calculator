@@ -1,17 +1,23 @@
 import type { CSSProperties } from "react";
-import type { TileMarker, MapTile as MapTileType, GameMapTileConfig } from "./types";
+import type { MapTile as MapTileType, GameMapTileConfig } from "./types";
 
 export type { MapTileType as MapTile };
+
+type MapTileStyle = CSSProperties & {
+  "--base-color": string;
+  "--rival-color": string;
+  "--enemy-color": string;
+};
 
 type MapTileComponentProps = {
   tileConfig: GameMapTileConfig;
   tileData: MapTileType;
   isSelected: boolean;
+  baseColor: string;
+  rivalColor: string;
+  enemyColor: string;
   onSelect: (tileId: string) => void;
-
-  selectedMarker?: TileMarker;
-  selectedRivalColor?: string;
-  selectedEnemyTeamId?: string;
+  onPaint: (tileId: string) => void;
 };
 
 function getCoordinate(tile: GameMapTileConfig): string {
@@ -23,7 +29,11 @@ export function MapTileComponent({
   tileConfig,
   tileData,
   isSelected,
+  baseColor,
+  rivalColor,
+  enemyColor,
   onSelect,
+  onPaint,
 }: MapTileComponentProps) {
   return (
     <button
@@ -31,9 +41,8 @@ export function MapTileComponent({
         isSelected ? "selected" : ""
       }`}
       type="button"
-      key={tileConfig.id}
       onClick={() => {
-        onSelect(tileConfig.id);
+        onPaint(tileConfig.id);
       }}
       onContextMenu={(event) => {
         if (isSelected !== true) {
@@ -48,7 +57,10 @@ export function MapTileComponent({
       style={{
         gridColumn: `${tileConfig.x} / span ${tileConfig.width}`,
         gridRow: `${tileConfig.y} / span ${tileConfig.height}`,
-      } as CSSProperties}
+        "--base-color": baseColor,
+        "--rival-color": rivalColor,
+        "--enemy-color": enemyColor,
+      } as MapTileStyle}
     >
       {tileConfig.kind === "town" ? (
         <span className="town-level">

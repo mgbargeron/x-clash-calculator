@@ -1,12 +1,20 @@
 import type { CSSProperties } from "react";
 import type { TileMarker } from "./types";
 
+type RivalButtonStyle = CSSProperties & {
+  "--rival-color": string;
+};
+
+type EnemyButtonStyle = CSSProperties & {
+  "--enemy-color": string;
+};
+
 type TeamItem = { code: string; name: string };
 
 type MapToolbarProps = {
   clearMarkerCount: number;
   selectedMarker: TileMarker;
-  ourTeam: TeamItem;
+  ourTeam: TeamItem & { color: string };
   rivalTeams: Array<{ color: string; name: string; code: string }>;
   enemyTeams: Array<{ id: string; name: string; code: string }>;
   selectedRivalColor: string;
@@ -19,7 +27,6 @@ type MapToolbarProps = {
 const markerTools: Array<{ marker: "none"; label: string; icon: string }> = [
   { marker: "none", label: "Clear marker", icon: "C" },
 ];
-
 const ENEMY_COLOR = "#CF3F45";
 
 function formatTeamDisplayLabel(code: string, name: string): string {
@@ -83,7 +90,7 @@ export function MapToolbar({
               onMarkerChange("rival");
               onRivalSelect(team.color);
             }}
-            style={{ "--rival-color": team.color } as CSSProperties}
+            style={{ "--rival-color": team.color } as RivalButtonStyle}
           >
             <span className="team-code">{team.code}</span>
           </button>
@@ -102,7 +109,7 @@ export function MapToolbar({
               onMarkerChange("enemy");
               onEnemySelect(team.id);
             }}
-            style={{ "--enemy-color": ENEMY_COLOR } as CSSProperties}
+            style={{ "--enemy-color": ENEMY_COLOR } as EnemyButtonStyle}
           >
             <span className="team-code">{team.code}</span>
           </button>

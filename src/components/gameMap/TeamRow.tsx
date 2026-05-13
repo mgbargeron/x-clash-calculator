@@ -1,6 +1,10 @@
 import type { CSSProperties } from "react";
 import type { MarkerPointSummary, OurTeamConfig, RivalTeam, EnemyTeam } from "./types";
 
+type TeamRowStyle = CSSProperties & {
+  "--score-color": string;
+};
+
 type TeamRowProps = {
   team: RivalTeam | EnemyTeam | OurTeamConfig;
   type: "our-team" | "rival" | "enemy";
@@ -37,13 +41,10 @@ export function TeamRow({
   onColorChange,
   onRemove,
 }: TeamRowProps) {
-  const key = type === "our-team" ? (team as OurTeamConfig).color : (team as EnemyTeam).id;
-
   return (
     <div
       className={`score-row ${type}`}
-      key={key}
-      style={{ "--score-color": teamColor } as CSSProperties}
+      style={{ "--score-color": teamColor } as TeamRowStyle}
     >
       <span className="score-color" aria-hidden="true" />
       <div className="rival-input-container">
@@ -70,7 +71,7 @@ export function TeamRow({
         <input
           type="color"
           className="rival-color-picker"
-          value={(team as OurTeamConfig | RivalTeam).color}
+          value={teamColor}
           disabled={locked}
           onChange={(e) => onColorChange?.(e.target.value)}
           title={`Change color for ${team.name}`}
