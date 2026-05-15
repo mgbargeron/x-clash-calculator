@@ -16,8 +16,11 @@ type MapTileComponentProps = {
   baseColor: string;
   rivalColor: string;
   enemyColor: string;
+  occupantCode?: string;
+  occupantLabel?: string;
   onSelect: (tileId: string) => void;
   onPaint: (tileId: string) => void;
+  onClear: (tileId: string) => void;
 };
 
 function getCoordinate(tile: GameMapTileConfig): string {
@@ -32,9 +35,19 @@ export function MapTileComponent({
   baseColor,
   rivalColor,
   enemyColor,
+  occupantCode,
+  occupantLabel,
   onSelect,
   onPaint,
+  onClear,
 }: MapTileComponentProps) {
+  const tileTitle =
+    tileData.note ||
+    (occupantLabel
+      ? `${occupantLabel} ${getCoordinate(tileConfig)} ${tileConfig.kind} level ${tileConfig.level}`
+      : `${getCoordinate(tileConfig)} ${tileConfig.kind} level ${tileConfig.level}`);
+  const chipClassName = tileConfig.kind === "town" ? "map-chip town-chip" : "map-chip mine-chip";
+
   return (
     <button
       className={`map-tile ${tileData.marker} ${tileConfig.kind} ${
@@ -45,15 +58,16 @@ export function MapTileComponent({
         onPaint(tileConfig.id);
       }}
       onContextMenu={(event) => {
-        if (isSelected !== true) {
+        if (tileData.marker === "none") {
           return;
         }
 
         event.preventDefault();
+        onClear(tileConfig.id);
       }}
       onFocus={() => onSelect(tileConfig.id)}
       aria-label={`Map tile ${getCoordinate(tileConfig)} ${tileConfig.kind} level ${tileConfig.level}`}
-      title={tileData.note || `${getCoordinate(tileConfig)} ${tileConfig.kind} level ${tileConfig.level}`}
+      title={tileTitle}
       style={{
         gridColumn: `${tileConfig.x} / span ${tileConfig.width}`,
         gridRow: `${tileConfig.y} / span ${tileConfig.height}`,
@@ -62,15 +76,10 @@ export function MapTileComponent({
         "--enemy-color": enemyColor,
       } as MapTileStyle}
     >
-      {tileConfig.kind === "town" ? (
-        <span className="town-level">
-          <span>{tileConfig.level}</span>
-        </span>
-      ) : (
-        <span className="frost-mine-level">
-          <span>{tileConfig.level}</span>
-        </span>
-      )}
+      <span className={chipClassName}>
+        <span className="tile-badge-level">{tileConfig.level}</span>
+        {occupantCode ? <span className="tile-badge-code">{occupantCode}</span> : null}
+      </span>
     </button>
   );
 }

@@ -15,12 +15,12 @@ type MapToolbarProps = {
   clearMarkerCount: number;
   selectedMarker: TileMarker;
   ourTeam: TeamItem & { color: string };
-  rivalTeams: Array<{ color: string; name: string; code: string }>;
+  rivalTeams: Array<{ id: string; color: string; name: string; code: string }>;
   enemyTeams: Array<{ id: string; name: string; code: string }>;
-  selectedRivalColor: string;
+  selectedRivalTeamId: string;
   selectedEnemyTeamId: string;
   onMarkerChange: (marker: TileMarker) => void;
-  onRivalSelect: (color: string) => void;
+  onRivalSelect: (id: string) => void;
   onEnemySelect: (id: string) => void;
 };
 
@@ -41,7 +41,7 @@ export function MapToolbar({
   ourTeam,
   rivalTeams,
   enemyTeams,
-  selectedRivalColor,
+  selectedRivalTeamId,
   selectedEnemyTeamId,
   onMarkerChange,
   onRivalSelect,
@@ -79,16 +79,16 @@ export function MapToolbar({
         </button>
         {rivalTeams.map((team) => (
           <button
-            key={team.color}
+            key={team.id}
             className={`icon-tool-button rival team-tool-button ${
-              selectedMarker === "rival" && selectedRivalColor === team.color ? "active" : ""
+              selectedMarker === "rival" && selectedRivalTeamId === team.id ? "active" : ""
             }`}
             type="button"
             title={formatTeamDisplayLabel(team.code, team.name)}
             aria-label={formatTeamDisplayLabel(team.code, team.name)}
             onClick={() => {
               onMarkerChange("rival");
-              onRivalSelect(team.color);
+              onRivalSelect(team.id);
             }}
             style={{ "--rival-color": team.color } as RivalButtonStyle}
           >

@@ -4,8 +4,8 @@ export type TileMarker = "none" | "base" | "enemy" | "rival";
 
 export type MapTile = {
   marker: TileMarker;
-  rivalColor: string;
-  enemyColor?: string;
+  rivalTeamId?: string;
+  enemyTeamId?: string;
   note: string;
 };
 
@@ -16,6 +16,7 @@ export type OurTeamConfig = {
 };
 
 export type RivalTeam = {
+  id: string;
   color: string;
   name: string;
   code: string;

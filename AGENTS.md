@@ -27,6 +27,11 @@ Prefer the smallest correct change.
 - Avoid overengineering.
 - Keep functions/components focused.
 
+## Map Identity Notes
+- Game map team references must use stable team ids, not mutable display fields like color, name, or code.
+- Map tiles, toolbar selection state, and score summaries should join rivals/enemies by team id only.
+- If stored map data needs migration, convert legacy display-based references to team ids during normalization instead of carrying both models forward.
+
 ## Performance for Agents
 - Minimize file reads.
 - Avoid repeated searches for the same symbol.

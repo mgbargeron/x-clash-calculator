@@ -16,10 +16,10 @@ type ScorePanelProps = {
   onUpdateOurTeamName: (value: string) => void;
   updateOurTeamColor: (color: string) => void;
   addRival: () => void;
-  updateRivalCode: (color: string, value: string) => void;
-  updateRivalName: (color: string, value: string) => void;
-  updateRivalColor: (color: string, value: string) => void;
-  removeRival: (color: string) => void;
+  updateRivalCode: (id: string, value: string) => void;
+  updateRivalName: (id: string, value: string) => void;
+  updateRivalColor: (id: string, value: string) => void;
+  removeRival: (id: string) => void;
   addEnemy: () => void;
   updateEnemyCode: (id: string, value: string) => void;
   updateEnemyName: (id: string, value: string) => void;
@@ -73,7 +73,7 @@ export function ScorePanel({
         onCodeChange={onUpdateOurTeamCode}
         onNameChange={onUpdateOurTeamName}
         onColorChange={updateOurTeamColor}
-        onRemove={() => removeRival(ourTeam.color)}
+        onRemove={() => {}}
       />
 
       {/* Rival teams - can edit name, code, and color */}
@@ -93,17 +93,17 @@ export function ScorePanel({
 
       {rivalTeams.map((team) => (
         <TeamRow
-          key={team.color}
+          key={team.id}
           team={team}
           type="rival"
-          points={rivalPoints[team.color]}
+          points={rivalPoints[team.id]}
           teamColor={team.color}
           locked={teamManagementLocked}
           hasColorPicker={true}
-          onCodeChange={(value) => updateRivalCode(team.color, value)}
-          onNameChange={(value) => updateRivalName(team.color, value)}
-          onColorChange={(color) => updateRivalColor(team.color, color)}
-          onRemove={() => removeRival(team.color)}
+          onCodeChange={(value) => updateRivalCode(team.id, value)}
+          onNameChange={(value) => updateRivalName(team.id, value)}
+          onColorChange={(color) => updateRivalColor(team.id, color)}
+          onRemove={() => removeRival(team.id)}
         />
       ))}
 

@@ -20,9 +20,9 @@ export function usePointSummaries({
   );
 
   const rivalPointSummary = useMemo(() => {
-    const summaryByColor: Record<string, MarkerPointSummary> = rivalTeams.reduce<Record<string, MarkerPointSummary>>(
+    const summaryById: Record<string, MarkerPointSummary> = rivalTeams.reduce<Record<string, MarkerPointSummary>>(
       (summary, team) => {
-        summary[team.color] = { count: 0, townPoints: 0, frostMinePoints: 0 };
+        summary[team.id] = { count: 0, townPoints: 0, frostMinePoints: 0 };
         return summary;
       },
       {}
@@ -32,7 +32,7 @@ export function usePointSummaries({
       const tile = tiles[tileConfig.id];
       if (tile?.marker !== "rival") continue;
 
-      const summary = summaryByColor[tile.rivalColor];
+      const summary = tile.rivalTeamId ? summaryById[tile.rivalTeamId] : undefined;
       if (!summary) continue;
 
       summary.count += 1;
@@ -43,7 +43,7 @@ export function usePointSummaries({
       }
     }
 
-    return summaryByColor;
+    return summaryById;
   }, [mapConfig.tiles, tiles, rivalTeams]);
 
   const ourTeamPointSummary = useMemo(() => {
@@ -64,7 +64,7 @@ export function usePointSummaries({
   }, [mapConfig.tiles, tiles]);
 
   const enemyPointSummary = useMemo(() => {
-    const summaryByColor: Record<string, MarkerPointSummary> = enemyTeams.reduce<Record<string, MarkerPointSummary>>(
+    const summaryById: Record<string, MarkerPointSummary> = enemyTeams.reduce<Record<string, MarkerPointSummary>>(
       (summary, team) => {
         summary[team.id] = { count: 0, townPoints: 0, frostMinePoints: 0 };
         return summary;
@@ -74,9 +74,9 @@ export function usePointSummaries({
 
     for (const tileConfig of mapConfig.tiles) {
       const tile = tiles[tileConfig.id];
-      if (tile?.marker !== "enemy" || !tile.enemyColor) continue;
+      if (tile?.marker !== "enemy" || !tile.enemyTeamId) continue;
 
-      const summary = summaryByColor[tile.enemyColor];
+      const summary = summaryById[tile.enemyTeamId];
       if (!summary) continue;
 
       summary.count += 1;
@@ -87,7 +87,7 @@ export function usePointSummaries({
       }
     }
 
-    return summaryByColor;
+    return summaryById;
   }, [mapConfig.tiles, tiles, enemyTeams]);
 
   return { clearMarkerCount, rivalPointSummary, ourTeamPointSummary, enemyPointSummary };

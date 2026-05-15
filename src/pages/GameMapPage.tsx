@@ -15,22 +15,16 @@ type GameMapSnapshot = {
   ourTeam: OurTeamConfig;
   enemyTeams: EnemyTeam[];
   selectedTileId: string;
-  selectedRivalColor: string;
+  selectedRivalTeamId: string;
   selectedEnemyTeamId: string;
 };
 
 const MAP_STORAGE_KEY = "game-map-v1";
 const MAX_ACTION_HISTORY = 10;
-
-const initialRivalColors = [
-  "#b08d57",
-  "#7a8fb8",
-  "#a16f96",
-  "#729b79",
-  "#9d8465",
-];
-
-const initialEnemyIds = ["enemy-1", "enemy-2", "enemy-3"];
+const MIN_MAP_ZOOM = 0.75;
+const MAX_MAP_ZOOM = 2;
+const DEFAULT_MAP_ZOOM = 1.2;
+const MAP_ZOOM_STEP = 0.1;
 
 type StoredMapData = {
   tiles?: Record<string, unknown> | null;
@@ -41,8 +35,32 @@ type StoredMapData = {
 };
 
 type StoredOurTeam = { color: string; name: string; code: string };
-type StoredRivalTeam = { color: string; name: string; code: string };
+type StoredRivalTeam = { id?: string; color: string; name: string; code: string };
 type StoredEnemyTeam = { id?: string; name: string; code: string };
+type StoredTile = {
+  marker?: unknown;
+  rivalColor?: unknown;
+  enemyColor?: unknown;
+  rivalTeamId?: unknown;
+  enemyTeamId?: unknown;
+  note?: unknown;
+};
+
+function createStableId(prefix: string): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return `${prefix}-${crypto.randomUUID()}`;
+  }
+
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function createRivalId(): string {
+  return createStableId("rival");
+}
+
+function createEnemyId(): string {
+  return createStableId("enemy");
+}
 
 function generateTeamCode(name: string): string {
   const trimmedName = name.trim();
@@ -76,22 +94,56 @@ function syncGeneratedCode(currentCode: string, previousName: string, nextName: 
   return currentCode;
 }
 
-function normalizeMap(mapConfig: GameMapConfig, storedTiles?: Record<string, unknown> | null): MapTilesById {
-  const defaultTile = { marker: "none" as TileMarker, rivalColor: initialRivalColors[0], enemyColor: initialEnemyIds[0], note: "" };
+function normalizeMap(
+  mapConfig: GameMapConfig,
+  rivalTeams: RivalTeam[],
+  enemyTeams: EnemyTeam[],
+  storedTiles?: Record<string, unknown> | null
+): MapTilesById {
+  const rivalIdByColor = new Map(rivalTeams.map((team) => [team.color, team.id]));
+  const enemyIds = new Set(enemyTeams.map((team) => team.id));
+
   return mapConfig.tiles.reduce<MapTilesById>(
-    (tiles, tile) => ({
-      ...tiles,
-      [tile.id]: storedTiles?.[tile.id] as MapTile ?? defaultTile,
-    }),
+    (tiles, tile) => {
+      const storedTile = storedTiles?.[tile.id] as StoredTile | undefined;
+      const normalizedMarker =
+        storedTile?.marker === "base" ||
+        storedTile?.marker === "enemy" ||
+        storedTile?.marker === "rival" ||
+        storedTile?.marker === "none"
+          ? storedTile.marker
+          : "none";
+      const rivalTeamId =
+        typeof storedTile?.rivalTeamId === "string"
+          ? storedTile.rivalTeamId
+          : typeof storedTile?.rivalColor === "string"
+            ? rivalIdByColor.get(storedTile.rivalColor)
+            : undefined;
+      const enemyTeamId =
+        typeof storedTile?.enemyTeamId === "string" && enemyIds.has(storedTile.enemyTeamId)
+          ? storedTile.enemyTeamId
+          : typeof storedTile?.enemyColor === "string" && enemyIds.has(storedTile.enemyColor)
+            ? storedTile.enemyColor
+            : undefined;
+
+      tiles[tile.id] = {
+        marker: normalizedMarker,
+        rivalTeamId,
+        enemyTeamId,
+        note: typeof storedTile?.note === "string" ? storedTile.note : "",
+      };
+
+      return tiles;
+    },
     {} as MapTilesById
   );
 }
 
 function normalizeRivalTeams(stored: unknown): RivalTeam[] {
   const arr = Array.isArray(stored) ? stored : [];
-  return (arr as StoredRivalTeam[]).map((t) => {
+  return (arr as StoredRivalTeam[]).map((t, index) => {
     const name = t.name || "Unnamed";
-    return { color: t.color, name, code: t.code || generateTeamCode(name) };
+    return { id: t.id ?? createStableId(`rival-${index + 1}`), color: t.color, name, code: t.code || generateTeamCode(name) };
   });
 }
 
@@ -103,7 +155,7 @@ function normalizeOurTeam(stored: unknown): OurTeamConfig {
 function normalizeEnemyTeams(stored: unknown): EnemyTeam[] {
   const arr = Array.isArray(stored) ? stored : [];
   return (arr as StoredEnemyTeam[]).map((t, idx) => ({
-    id: t.id ?? `enemy-${idx + 1}`,
+    id: t.id ?? createStableId(`enemy-${idx + 1}`),
     name: t.name || "Enemy",
     code: t.code || generateTeamCode(t.name || "Enemy"),
   }));
@@ -153,19 +205,20 @@ export default function GameMapPage({ navigation }: GameMapPageProps) {
   const undoStackRef = useRef<GameMapSnapshot[]>([]);
 
   // State
-  const [tiles, setTiles] = useState<MapTilesById>(() => normalizeMap(mapConfig));
+  const [tiles, setTiles] = useState<MapTilesById>(() => normalizeMap(mapConfig, [], []));
   const [selectedMarker, setSelectedMarker] = useState<TileMarker>("base");
-  const [selectedRivalColor, setSelectedRivalColor] = useState(initialRivalColors[0]);
+  const [selectedRivalTeamId, setSelectedRivalTeamId] = useState("");
   const [selectedTileId, setSelectedTileId] = useState(firstTileId);
   const [teamManagementLocked, setTeamManagementLocked] = useState(true);
   const [rivalTeams, setRivalTeams] = useState<RivalTeam[]>([]);
   const [ourTeam, setOurTeam] = useState<OurTeamConfig>({ color: "#45b66b", name: "Our Team", code: "OUR" });
   const [enemyTeams, setEnemyTeams] = useState<EnemyTeam[]>([]);
-  const [selectedEnemyTeamId, setSelectedEnemyTeamId] = useState(initialEnemyIds[0]);
+  const [selectedEnemyTeamId, setSelectedEnemyTeamId] = useState("");
+  const [mapZoom, setMapZoom] = useState(DEFAULT_MAP_ZOOM);
 
   // Undo system
   function getCurrentSnapshot(): GameMapSnapshot {
-    return latestSnapshotRef.current ?? { tiles, rivalTeams, ourTeam, enemyTeams, selectedTileId, selectedRivalColor, selectedEnemyTeamId };
+    return latestSnapshotRef.current ?? { tiles, rivalTeams, ourTeam, enemyTeams, selectedTileId, selectedRivalTeamId, selectedEnemyTeamId };
   }
 
   function applySnapshot(snapshot: GameMapSnapshot) {
@@ -175,7 +228,7 @@ export default function GameMapPage({ navigation }: GameMapPageProps) {
     setOurTeam(snapshot.ourTeam);
     setEnemyTeams(snapshot.enemyTeams);
     setSelectedTileId(snapshot.selectedTileId);
-    setSelectedRivalColor(snapshot.selectedRivalColor);
+    setSelectedRivalTeamId(snapshot.selectedRivalTeamId);
     setSelectedEnemyTeamId(snapshot.selectedEnemyTeamId);
   }
 
@@ -186,7 +239,7 @@ export default function GameMapPage({ navigation }: GameMapPageProps) {
       a.ourTeam === b.ourTeam &&
       a.enemyTeams === b.enemyTeams &&
       a.selectedTileId === b.selectedTileId &&
-      a.selectedRivalColor === b.selectedRivalColor &&
+      a.selectedRivalTeamId === b.selectedRivalTeamId &&
       a.selectedEnemyTeamId === b.selectedEnemyTeamId
     );
   }
@@ -214,14 +267,19 @@ export default function GameMapPage({ navigation }: GameMapPageProps) {
 
     void loadStoredMap().then((storedMap) => {
       if (!isMounted) return;
+      const normalizedRivalTeams =
+        storedMap.rivalTeams && (storedMap.rivalTeams as any[]).length > 0 ? normalizeRivalTeams(storedMap.rivalTeams) : [];
+      const normalizedEnemyTeams =
+        storedMap.enemyTeams && (storedMap.enemyTeams as any[]).length > 0 ? normalizeEnemyTeams(storedMap.enemyTeams) : [];
+
       applySnapshot({
-        tiles: normalizeMap(mapConfig, storedMap.tiles),
-        rivalTeams: storedMap.rivalTeams && (storedMap.rivalTeams as any[]).length > 0 ? normalizeRivalTeams(storedMap.rivalTeams) : [],
+        tiles: normalizeMap(mapConfig, normalizedRivalTeams, normalizedEnemyTeams, storedMap.tiles),
+        rivalTeams: normalizedRivalTeams,
         ourTeam: storedMap.ourTeam ? normalizeOurTeam(storedMap.ourTeam) : { color: "#45b66b", name: "Our Team", code: "OUR" },
-        enemyTeams: storedMap.enemyTeams && (storedMap.enemyTeams as any[]).length > 0 ? normalizeEnemyTeams(storedMap.enemyTeams) : [],
+        enemyTeams: normalizedEnemyTeams,
         selectedTileId: storedMap.selectedTileId ?? firstTileId,
-        selectedRivalColor: (storedMap.rivalTeams && (storedMap.rivalTeams as any[])[0])?.color ?? initialRivalColors[0],
-        selectedEnemyTeamId: (storedMap.enemyTeams && (storedMap.enemyTeams as any[])[0])?.id ?? "",
+        selectedRivalTeamId: normalizedRivalTeams[0]?.id ?? "",
+        selectedEnemyTeamId: normalizedEnemyTeams[0]?.id ?? "",
       });
       undoStackRef.current = [];
       hasLoadedStoredMap.current = true;
@@ -232,8 +290,8 @@ export default function GameMapPage({ navigation }: GameMapPageProps) {
 
   // Snapshot tracking
   useEffect(() => {
-    latestSnapshotRef.current = { tiles, rivalTeams, ourTeam, enemyTeams, selectedTileId, selectedRivalColor, selectedEnemyTeamId };
-  }, [tiles, rivalTeams, ourTeam, enemyTeams, selectedTileId, selectedRivalColor, selectedEnemyTeamId]);
+    latestSnapshotRef.current = { tiles, rivalTeams, ourTeam, enemyTeams, selectedTileId, selectedRivalTeamId, selectedEnemyTeamId };
+  }, [tiles, rivalTeams, ourTeam, enemyTeams, selectedTileId, selectedRivalTeamId, selectedEnemyTeamId]);
 
   // Save on change
   useEffect(() => {
@@ -287,7 +345,7 @@ export default function GameMapPage({ navigation }: GameMapPageProps) {
 
   // Reset map
   function resetMap() {
-    commitAction((c) => ({ ...c, tiles: normalizeMap(mapConfig) }));
+    commitAction((c) => ({ ...c, tiles: normalizeMap(mapConfig, c.rivalTeams, c.enemyTeams) }));
   }
 
   // Team management handlers
@@ -298,38 +356,127 @@ export default function GameMapPage({ navigation }: GameMapPageProps) {
   function addRival() {
     const name = "Rival";
     const newColor = "#9d8465"; // Next color in rotation
-    commitAction((c) => ({ ...c, rivalTeams: [...c.rivalTeams, { color: newColor, name, code: generateTeamCode(name) }] }));
+    const newId = createRivalId();
+    commitAction((c) => ({
+      ...c,
+      rivalTeams: [...c.rivalTeams, { id: newId, color: newColor, name, code: generateTeamCode(name) }],
+      selectedRivalTeamId: newId,
+    }));
   }
 
-  function updateRivalCode(color: string, value: string) { commitAction((c) => ({ ...c, rivalTeams: c.rivalTeams.map(t => t.color === color ? { ...t, code: value } : t) })); }
-  function updateRivalName(color: string, value: string) { commitAction((c) => ({ ...c, rivalTeams: c.rivalTeams.map(t => t.color === color ? { ...t, name: value, code: syncGeneratedCode(t.code, t.name, value) } : t) })); }
-  function updateRivalColor(color: string, value: string) { commitAction((c) => ({ ...c, rivalTeams: c.rivalTeams.map(t => t.color === color ? { ...t, color: value } : t) })); }
-  function removeRival(color: string) { commitAction((c) => ({ ...c, rivalTeams: c.rivalTeams.filter(t => t.color !== color), selectedRivalColor: initialRivalColors[0] })); }
+  function updateRivalCode(id: string, value: string) {
+    commitAction((c) => ({
+      ...c,
+      rivalTeams: c.rivalTeams.map((team) => team.id === id ? { ...team, code: value } : team),
+    }));
+  }
+
+  function updateRivalName(id: string, value: string) {
+    commitAction((c) => ({
+      ...c,
+      rivalTeams: c.rivalTeams.map((team) =>
+        team.id === id ? { ...team, name: value, code: syncGeneratedCode(team.code, team.name, value) } : team
+      ),
+    }));
+  }
+
+  function updateRivalColor(id: string, value: string) {
+    commitAction((c) => {
+      const rivalTeam = c.rivalTeams.find((team) => team.id === id);
+      if (!rivalTeam) return c;
+
+      return {
+        ...c,
+        rivalTeams: c.rivalTeams.map((team) =>
+          team.id === id ? { ...team, color: value } : team
+        ),
+      };
+    });
+  }
+
+  function removeRival(id: string) {
+    const current = getCurrentSnapshot();
+    const rivalTeam = current.rivalTeams.find((team) => team.id === id);
+    if (!rivalTeam) return;
+
+    const shouldSelectClearMarker =
+      selectedMarker === "rival" && current.selectedRivalTeamId === rivalTeam.id;
+
+    commitAction((c) => ({
+      ...c,
+      rivalTeams: c.rivalTeams.filter((team) => team.id !== id),
+      tiles: Object.fromEntries(
+        Object.entries(c.tiles).map(([tileId, tile]) => [
+          tileId,
+          tile.marker === "rival" && tile.rivalTeamId === rivalTeam.id
+            ? { ...tile, marker: "none" }
+            : tile,
+        ])
+      ),
+      selectedRivalTeamId: c.selectedRivalTeamId === rivalTeam.id ? "" : c.selectedRivalTeamId,
+    }));
+
+    if (shouldSelectClearMarker) {
+      setSelectedMarker("none");
+    }
+  }
 
   function addEnemy() {
-    const newId = `enemy-${Date.now() % 1000}`;
+    const newId = createEnemyId();
     const name = "Enemy";
-    commitAction((c) => ({ ...c, enemyTeams: [...c.enemyTeams, { id: newId, name, code: generateTeamCode(name) }] }));
+    commitAction((c) => ({
+      ...c,
+      enemyTeams: [...c.enemyTeams, { id: newId, name, code: generateTeamCode(name) }],
+      selectedEnemyTeamId: newId,
+    }));
   }
 
   function updateEnemyCode(id: string, value: string) { commitAction((c) => ({ ...c, enemyTeams: c.enemyTeams.map(t => t.id === id ? { ...t, code: value } : t) })); }
   function updateEnemyName(id: string, value: string) { commitAction((c) => ({ ...c, enemyTeams: c.enemyTeams.map(t => t.id === id ? { ...t, name: value, code: syncGeneratedCode(t.code, t.name, value) } : t) })); }
-  function removeEnemy(id: string) { commitAction((c) => ({ ...c, enemyTeams: c.enemyTeams.filter(t => t.id !== id), selectedEnemyTeamId: initialEnemyIds[0] })); }
+  function removeEnemy(id: string) {
+    const current = getCurrentSnapshot();
+    const enemyTeam = current.enemyTeams.find((team) => team.id === id);
+    if (!enemyTeam) return;
+
+    const shouldSelectClearMarker =
+      selectedMarker === "enemy" && current.selectedEnemyTeamId === enemyTeam.id;
+
+    commitAction((c) => ({
+      ...c,
+      enemyTeams: c.enemyTeams.filter((team) => team.id !== id),
+      tiles: Object.fromEntries(
+        Object.entries(c.tiles).map(([tileId, tile]) => [
+          tileId,
+          tile.marker === "enemy" && tile.enemyTeamId === enemyTeam.id
+            ? { ...tile, marker: "none" }
+            : tile,
+        ])
+      ),
+      selectedEnemyTeamId: c.selectedEnemyTeamId === enemyTeam.id ? "" : c.selectedEnemyTeamId,
+    }));
+
+    if (shouldSelectClearMarker) {
+      setSelectedMarker("none");
+    }
+  }
 
   function paintTile(tileId: string) {
     commitAction((current) => {
+      if (selectedMarker === "rival" && !current.selectedRivalTeamId) return current;
+      if (selectedMarker === "enemy" && !current.selectedEnemyTeamId) return current;
+
       const existingTile = current.tiles[tileId] ?? {
         marker: "none" as TileMarker,
-        rivalColor: current.selectedRivalColor,
-        enemyColor: current.selectedEnemyTeamId,
+        rivalTeamId: current.selectedRivalTeamId || undefined,
+        enemyTeamId: current.selectedEnemyTeamId || undefined,
         note: "",
       };
 
       const nextTile: MapTile = {
         ...existingTile,
         marker: selectedMarker,
-        rivalColor: selectedRivalColor,
-        enemyColor: selectedEnemyTeamId,
+        rivalTeamId: selectedMarker === "rival" ? current.selectedRivalTeamId || undefined : existingTile.rivalTeamId,
+        enemyTeamId: selectedMarker === "enemy" ? current.selectedEnemyTeamId || undefined : existingTile.enemyTeamId,
       };
 
       return {
@@ -341,6 +488,31 @@ export default function GameMapPage({ navigation }: GameMapPageProps) {
         },
       };
     });
+  }
+
+  function clearTile(tileId: string) {
+    commitAction((current) => {
+      const existingTile = current.tiles[tileId];
+      if (!existingTile || existingTile.marker === "none") {
+        return current;
+      }
+
+      return {
+        ...current,
+        selectedTileId: tileId,
+        tiles: {
+          ...current.tiles,
+          [tileId]: {
+            ...existingTile,
+            marker: "none",
+          },
+        },
+      };
+    });
+  }
+
+  function clampMapZoom(value: number) {
+    return Math.min(MAX_MAP_ZOOM, Math.max(MIN_MAP_ZOOM, Number(value.toFixed(2))));
   }
 
   // Render
@@ -360,24 +532,69 @@ export default function GameMapPage({ navigation }: GameMapPageProps) {
         ourTeam={ourTeam}
         rivalTeams={rivalTeams}
         enemyTeams={enemyTeams}
-        selectedRivalColor={selectedRivalColor}
+        selectedRivalTeamId={selectedRivalTeamId}
         selectedEnemyTeamId={selectedEnemyTeamId}
         onMarkerChange={setSelectedMarker}
-        onRivalSelect={setSelectedRivalColor}
+        onRivalSelect={(id) => {
+          setSelectedRivalTeamId(id);
+        }}
         onEnemySelect={setSelectedEnemyTeamId}
       />
 
       <div className="map-layout">
         <div className="map-board-column">
+          <div className="map-board-controls" aria-label="Map board zoom controls">
+            <button
+              className="map-zoom-button"
+              type="button"
+              onClick={() => setMapZoom((current) => clampMapZoom(current - MAP_ZOOM_STEP))}
+              disabled={mapZoom <= MIN_MAP_ZOOM}
+              aria-label="Zoom out map"
+              title="Zoom out"
+            >
+              -
+            </button>
+            <input
+              className="map-zoom-slider"
+              type="range"
+              min={MIN_MAP_ZOOM}
+              max={MAX_MAP_ZOOM}
+              step={0.05}
+              value={mapZoom}
+              onChange={(event) => setMapZoom(clampMapZoom(Number(event.target.value)))}
+              aria-label="Map zoom"
+            />
+            <button
+              className="map-zoom-button"
+              type="button"
+              onClick={() => setMapZoom((current) => clampMapZoom(current + MAP_ZOOM_STEP))}
+              disabled={mapZoom >= MAX_MAP_ZOOM}
+              aria-label="Zoom in map"
+              title="Zoom in"
+            >
+              +
+            </button>
+            <button
+              className="map-zoom-reset"
+              type="button"
+              onClick={() => setMapZoom(DEFAULT_MAP_ZOOM)}
+              aria-label="Reset map zoom"
+            >
+              {Math.round(mapZoom * 100)}%
+            </button>
+          </div>
           <MapBoard
             config={mapConfig}
             tiles={tiles}
             selectedTileId={selectedTileId}
-            baseColor={ourTeam.color}
+            ourTeam={ourTeam}
             rivalTeams={rivalTeams}
+            enemyTeams={enemyTeams}
+            zoom={mapZoom}
             boardRef={boardRef}
             onTileSelect={setSelectedTileId}
             onTilePaint={paintTile}
+            onTileClear={clearTile}
           />
         </div>
 
