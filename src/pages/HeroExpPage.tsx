@@ -1,5 +1,5 @@
 import {type ReactNode} from "react";
-import HeroExpCalculator from "../HeroExpCalculator";
+import { HeroExpCalculator } from "../components/heroExp";
 
 const HERO_EXP_STORAGE_KEY = "hero-exp-quantity-rows";
 
