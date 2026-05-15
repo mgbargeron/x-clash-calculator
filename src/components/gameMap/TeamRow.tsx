@@ -79,16 +79,18 @@ export function TeamRow({
       )}
 
       {renderPointSummary(points)}
-      <button
-        className="remove-team-button"
-        type="button"
-        title={`Remove ${team.name}`}
-        aria-label={`Remove ${team.name}`}
-        onClick={onRemove}
-        disabled={locked}
-      >
-        ×
-      </button>
+      {type !== "our-team" && (
+        <button
+          className="remove-team-button asidetip"
+          type="button"
+          data-tip={`Remove ${team.name}`}
+          aria-label={`Remove ${team.name}`}
+          onClick={onRemove}
+          disabled={locked}
+        >
+          ×
+        </button>
+      )}
     </div>
   );
 }

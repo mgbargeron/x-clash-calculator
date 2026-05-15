@@ -38,11 +38,11 @@ export function LockableControls({ locked, onToggleLock, onResetMap }: LockableC
   return (
     <div className="aside-controls">
       <button
-        className={`secondary-button aside-control-button lock-button ${locked ? "active" : ""}`}
+        className={`secondary-button aside-control-button lock-button asidetip ${locked ? "active" : ""}`}
         type="button"
         onClick={onToggleLock}
         aria-pressed={locked}
-        title={locked ? "Unlock team add/remove and reset" : "Lock team add/remove and reset"}
+        data-tip={locked ? "Unlock team management" : "Lock team management"}
         aria-label={locked ? "Unlock team add/remove and reset" : "Lock team add/remove and reset"}
       >
         {locked ? <LockIcon /> : <UnlockIcon />}

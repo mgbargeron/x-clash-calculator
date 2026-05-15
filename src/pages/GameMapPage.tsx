@@ -215,6 +215,7 @@ export default function GameMapPage({ navigation }: GameMapPageProps) {
   const [enemyTeams, setEnemyTeams] = useState<EnemyTeam[]>([]);
   const [selectedEnemyTeamId, setSelectedEnemyTeamId] = useState("");
   const [mapZoom, setMapZoom] = useState(DEFAULT_MAP_ZOOM);
+  const [panelCollapsed, setPanelCollapsed] = useState(false);
 
   // Undo system
   function getCurrentSnapshot(): GameMapSnapshot {
@@ -340,7 +341,7 @@ export default function GameMapPage({ navigation }: GameMapPageProps) {
   }, [handleKeyDown]);
 
   // Point summaries (extracted to hook)
-  const { clearMarkerCount } = usePointSummaries({ mapConfig, tiles, rivalTeams, enemyTeams });
+  const { clearMarkerCount, ourTeamPointSummary, rivalPointSummary, enemyPointSummary } = usePointSummaries({ mapConfig, tiles, rivalTeams, enemyTeams });
 
 
   // Reset map
@@ -541,8 +542,21 @@ export default function GameMapPage({ navigation }: GameMapPageProps) {
         onEnemySelect={setSelectedEnemyTeamId}
       />
 
-      <div className="map-layout">
+      <div className={`map-layout${panelCollapsed ? " map-layout--panel-collapsed" : ""}`}>
         <div className="map-board-column">
+          <MapBoard
+            config={mapConfig}
+            tiles={tiles}
+            selectedTileId={selectedTileId}
+            ourTeam={ourTeam}
+            rivalTeams={rivalTeams}
+            enemyTeams={enemyTeams}
+            zoom={mapZoom}
+            boardRef={boardRef}
+            onTileSelect={setSelectedTileId}
+            onTilePaint={paintTile}
+            onTileClear={clearTile}
+          />
           <div className="map-board-controls" aria-label="Map board zoom controls">
             <button
               className="map-zoom-button"
@@ -583,49 +597,32 @@ export default function GameMapPage({ navigation }: GameMapPageProps) {
               {Math.round(mapZoom * 100)}%
             </button>
           </div>
-          <MapBoard
-            config={mapConfig}
-            tiles={tiles}
-            selectedTileId={selectedTileId}
-            ourTeam={ourTeam}
-            rivalTeams={rivalTeams}
-            enemyTeams={enemyTeams}
-            zoom={mapZoom}
-            boardRef={boardRef}
-            onTileSelect={setSelectedTileId}
-            onTilePaint={paintTile}
-            onTileClear={clearTile}
-          />
         </div>
 
-        {(() => {
-          const summaries = usePointSummaries({ mapConfig, tiles, rivalTeams, enemyTeams });
-          return (
-            <ScorePanel
-              teamManagementLocked={teamManagementLocked}
-              ourTeam={ourTeam}
-              rivalTeams={rivalTeams}
-              enemyTeams={enemyTeams}
-              ourTeamPoints={summaries.ourTeamPointSummary}
-              rivalPoints={summaries.rivalPointSummary}
-              enemyPoints={summaries.enemyPointSummary}
-              onToggleLock={() => setTeamManagementLocked(l => !l)}
-              onResetMap={resetMap}
-              onUpdateOurTeamCode={updateOurTeamCode}
-              onUpdateOurTeamName={updateOurTeamName}
-              updateOurTeamColor={updateOurTeamColor}
-              addRival={addRival}
-              updateRivalCode={updateRivalCode}
-              updateRivalName={updateRivalName}
-              updateRivalColor={updateRivalColor}
-              removeRival={removeRival}
-              addEnemy={addEnemy}
-              updateEnemyCode={updateEnemyCode}
-              updateEnemyName={updateEnemyName}
-              removeEnemy={removeEnemy}
-            />
-          );
-        })()}
+        <ScorePanel
+          teamManagementLocked={teamManagementLocked}
+          ourTeam={ourTeam}
+          rivalTeams={rivalTeams}
+          enemyTeams={enemyTeams}
+          ourTeamPoints={ourTeamPointSummary}
+          rivalPoints={rivalPointSummary}
+          enemyPoints={enemyPointSummary}
+          onToggleLock={() => setTeamManagementLocked(l => !l)}
+          onResetMap={resetMap}
+          onUpdateOurTeamCode={updateOurTeamCode}
+          onUpdateOurTeamName={updateOurTeamName}
+          updateOurTeamColor={updateOurTeamColor}
+          addRival={addRival}
+          updateRivalCode={updateRivalCode}
+          updateRivalName={updateRivalName}
+          updateRivalColor={updateRivalColor}
+          removeRival={removeRival}
+          addEnemy={addEnemy}
+          updateEnemyCode={updateEnemyCode}
+          updateEnemyName={updateEnemyName}
+          removeEnemy={removeEnemy}
+          onCollapseChange={setPanelCollapsed}
+        />
       </div>
     </section>
   );

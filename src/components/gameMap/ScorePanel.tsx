@@ -1,6 +1,37 @@
+import { useState, type ReactNode } from "react";
 import type { MarkerPointSummary, OurTeamConfig, RivalTeam, EnemyTeam } from "./types";
 import { LockableControls } from "./LockableControls";
 import { TeamRow } from "./TeamRow";
+
+function ChevronRightIcon(): ReactNode {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" width="16" height="16">
+      <path
+        d="M9 6l6 6-6 6"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function ChevronLeftIcon(): ReactNode {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" width="16" height="16">
+      <path
+        d="M15 6l-6 6 6 6"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
 
 type ScorePanelProps = {
   teamManagementLocked: boolean;
@@ -24,6 +55,7 @@ type ScorePanelProps = {
   updateEnemyCode: (id: string, value: string) => void;
   updateEnemyName: (id: string, value: string) => void;
   removeEnemy: (id: string) => void;
+  onCollapseChange?: (collapsed: boolean) => void;
 };
 const ENEMY_COLOR = "#CF3F45";
 
@@ -49,9 +81,43 @@ export function ScorePanel({
   updateEnemyCode,
   updateEnemyName,
   removeEnemy,
+  onCollapseChange,
 }: ScorePanelProps) {
+  const [collapsed, setCollapsed] = useState(false);
+  const toggleCollapsed = (next: boolean) => {
+    setCollapsed(next);
+    onCollapseChange?.(next);
+  };
+
+  if (collapsed) {
+    return (
+      <aside className="map-score-panel" aria-label="Map score summary">
+        <button
+          className="secondary-button aside-control-button asidetip"
+          type="button"
+          onClick={() => toggleCollapsed(false)}
+          aria-label="Show score panel"
+          data-tip="Show score panel"
+          style={{ minWidth: 0, padding: "4px 8px", lineHeight: 1 }}
+        >
+          <ChevronLeftIcon />
+        </button>
+      </aside>
+    );
+  }
+
   return (
     <aside className="map-score-panel" aria-label="Map score summary">
+      <button
+        className="secondary-button aside-control-button asidetip"
+        type="button"
+        onClick={() => toggleCollapsed(true)}
+        aria-label="Hide score panel"
+        data-tip="Hide score panel"
+        style={{ width: 32, minWidth: 32, padding: 0, display: "grid", placeItems: "center" }}
+      >
+        <ChevronRightIcon />
+      </button>
       <LockableControls
         locked={teamManagementLocked}
         onToggleLock={onToggleLock}
@@ -80,9 +146,9 @@ export function ScorePanel({
       <div className="score-group-label">
         <span>Rival Teams</span>
         <button
-          className="aside-add-button"
+          className="aside-add-button asidetip"
           type="button"
-          title="Add New Rival Team"
+          data-tip="Add New Rival Team"
           aria-label="Add New Rival Team"
           onClick={addRival}
           disabled={teamManagementLocked}
@@ -111,9 +177,9 @@ export function ScorePanel({
       <div className="score-group-label">
         <span>Enemy Teams</span>
         <button
-          className="aside-add-button"
+          className="aside-add-button asidetip"
           type="button"
-          title="Add New Enemy Team"
+          data-tip="Add New Enemy Team"
           aria-label="Add New Enemy Team"
           onClick={addEnemy}
           disabled={teamManagementLocked}

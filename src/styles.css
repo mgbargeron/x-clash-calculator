@@ -62,6 +62,7 @@ body,
 
 body {
     min-height: 100vh;
+    overflow-x: hidden;
 }
 
 .app {
@@ -188,6 +189,41 @@ h1 {
     align-items: start;
     width: 100%;
     min-width: 0;
+}
+
+.map-panel-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    width: auto;
+    min-width: 120px;
+    padding: 8px 14px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(157, 177, 255, 0.3);
+    cursor: pointer;
+    color: #dfe6ff;
+    font-size: 0.8rem;
+    font-weight: 700;
+    transition: background 0.2s ease;
+}
+
+.map-panel-toggle:hover {
+    background: rgba(157, 177, 255, 0.2);
+}
+
+.map-panel-toggle:focus-visible {
+    outline: 2px solid rgba(157, 177, 255, 0.78);
+    outline-offset: 2px;
+}
+
+.map-panel-toggle-icon {
+    font-size: 0.9rem;
+}
+
+.map-layout--panel-collapsed {
+    grid-template-columns: minmax(0, 1fr) auto;
 }
 
 .map-board-column {
@@ -362,6 +398,29 @@ h1 {
     min-width: 0;
 }
 
+.asidetip {
+    position: relative;
+}
+
+.asidetip:hover::after {
+    content: attr(data-tip);
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 5px 10px;
+    border-radius: 6px;
+    background: #1a1a2e;
+    color: #dfe6ff;
+    font-size: 0.75rem;
+    font-weight: 600;
+    white-space: nowrap;
+    pointer-events: none;
+    z-index: 100;
+    border: 1px solid rgba(157, 177, 255, 0.25);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
 .aside-controls {
     display: flex;
     align-items: center;
@@ -468,7 +527,6 @@ h1 {
 }
 
 .remove-team-button {
-    position: static;
     display: grid;
     place-items: center;
     width: 24px;
