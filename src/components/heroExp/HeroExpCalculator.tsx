@@ -213,6 +213,11 @@ export default function HeroExpCalculator({
 }: HeroExpCalculatorProps) {
   const levelListRef = useRef<HTMLDivElement | null>(null);
   const currentLevelRef = useRef<HTMLDivElement | null>(null);
+  const isMounted = useRef(false);
+
+  useEffect(() => {
+    isMounted.current = true;
+  }, []);
 
   const initialRows = useMemo<Row[]>(
     () => [
@@ -309,7 +314,18 @@ export default function HeroExpCalculator({
     };
   }, [startLevel, desiredLevel, totalExp]);
 
-  useScrollToElement({ listRef: levelListRef, targetRef: currentLevelRef, triggerId: [progression.achievedLevel, startLevel] });
+  useEffect(() => {
+    if (!isMounted.current) return;
+    const listElement = levelListRef.current;
+    const targetElement = currentLevelRef.current;
+    if (!listElement || !targetElement) return;
+
+    const listRect = listElement.getBoundingClientRect();
+    const targetRect = targetElement.getBoundingClientRect();
+    const relativeTop = targetRect.top - listRect.top;
+
+    listElement.scrollTo({ top: listElement.scrollTop + relativeTop, behavior: "smooth" });
+  }, [progression.achievedLevel]);
 
   const chestRequirements = useMemo(
     () =>
