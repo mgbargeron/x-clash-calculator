@@ -19,6 +19,7 @@ type HeroExpCalculatorProps = {
 };
 
 const START_LEVEL_STORAGE_SUFFIX = "-start-level";
+const DESIRED_LEVEL_STORAGE_SUFFIX = "-desired-level";
 const MAX_HERO_LEVEL = 150;
 
 const HERO_LEVEL_COSTS_RAW: Record<string, number | string> = {
@@ -225,6 +226,7 @@ export default function HeroExpCalculator({
   const { rows, setRows } = useInitialRowsSync({ initialRows, storageKey });
 
   const [startLevel, setStartLevel] = useLocalStorage<number>(`${storageKey}${START_LEVEL_STORAGE_SUFFIX}`, 1);
+  const [desiredLevel, setDesiredLevel] = useLocalStorage<number>(`${storageKey}${DESIRED_LEVEL_STORAGE_SUFFIX}`, MAX_HERO_LEVEL);
 
   useEffect(() => {
     if (!Number.isFinite(startLevel)) {
@@ -233,6 +235,16 @@ export default function HeroExpCalculator({
       setStartLevel(clampLevel(startLevel));
     }
   }, [startLevel, setStartLevel]);
+
+  useEffect(() => {
+    if (!Number.isFinite(desiredLevel)) {
+      setDesiredLevel(clampLevel(MAX_HERO_LEVEL));
+    } else if (desiredLevel < 1 || desiredLevel > MAX_HERO_LEVEL) {
+      setDesiredLevel(clampLevel(desiredLevel));
+    } else if (desiredLevel < startLevel) {
+      setDesiredLevel(startLevel);
+    }
+  }, [desiredLevel, setDesiredLevel, startLevel]);
 
   const rowTotals = useMemo(
     () =>
@@ -277,6 +289,11 @@ export default function HeroExpCalculator({
       expToMax = expToMax.plus(HERO_LEVEL_COSTS[level]);
     }
 
+    let expToDesired = new Decimal(0);
+    for (let level = startLevel; level < desiredLevel; level += 1) {
+      expToDesired = expToDesired.plus(HERO_LEVEL_COSTS[level]);
+    }
+
     return {
       achievedLevel,
       levelsGained: achievedLevel - startLevel,
@@ -286,9 +303,11 @@ export default function HeroExpCalculator({
       nextLevelCost,
       expNeededForNextLevel,
       expToMax,
+      expToDesired,
       expStillNeededToMax: Decimal.max(expToMax.minus(totalExp), new Decimal(0)),
+      expStillNeededToDesired: Decimal.max(expToDesired.minus(totalExp), new Decimal(0)),
     };
-  }, [startLevel, totalExp]);
+  }, [startLevel, desiredLevel, totalExp]);
 
   useScrollToElement({ listRef: levelListRef, targetRef: currentLevelRef, triggerId: [progression.achievedLevel, startLevel] });
 
@@ -304,15 +323,20 @@ export default function HeroExpCalculator({
           chestValue.gt(0) && progression.expToMax.gt(0)
             ? progression.expToMax.div(chestValue).ceil()
             : new Decimal(0);
+        const toDesired =
+          chestValue.gt(0) && progression.expToDesired.gt(0)
+            ? progression.expToDesired.div(chestValue).ceil()
+            : new Decimal(0);
 
         return {
           description: row.description,
           chestValue,
           toNext,
           toMax,
+          toDesired,
         };
       }),
-    [progression.expNeededForNextLevel, progression.expToMax, rows]
+    [progression.expNeededForNextLevel, progression.expToMax, progression.expToDesired, rows]
   );
 
   const nextLevelProgressPercent = useMemo(() => {
@@ -328,15 +352,15 @@ export default function HeroExpCalculator({
     );
   }, [progression.achievedLevel, progression.nextLevelCost, progression.remainingExp]);
 
-  const maxLevelProgressPercent = useMemo(() => {
-    if (progression.expToMax.lte(0)) {
+  const desiredLevelProgressPercent = useMemo(() => {
+    if (progression.expToDesired.lte(0)) {
       return 100;
     }
 
     return Number(
-      Decimal.min(totalExp.div(progression.expToMax).mul(100), new Decimal(100)).toFixed(1)
+      Decimal.min(totalExp.div(progression.expToDesired).mul(100), new Decimal(100)).toFixed(1)
     );
-  }, [progression.expToMax, totalExp]);
+  }, [progression.expToDesired, totalExp]);
 
   type LevelState = "achieved" | "current" | "next" | "pending";
 
@@ -386,11 +410,13 @@ export default function HeroExpCalculator({
         <HeroExpOverview
           startLevel={startLevel}
           setStartLevel={setStartLevel}
+          desiredLevel={desiredLevel}
+          setDesiredLevel={setDesiredLevel}
           clampLevel={clampLevel}
           LEVEL_OPTIONS={LEVEL_OPTIONS}
           progression={progression}
           nextLevelProgressPercent={nextLevelProgressPercent}
-          maxLevelProgressPercent={maxLevelProgressPercent}
+          desiredLevelProgressPercent={desiredLevelProgressPercent}
           totalExp={totalExp}
         />
 
@@ -403,6 +429,7 @@ export default function HeroExpCalculator({
         <HeroExpRequirements
           chestRequirements={chestRequirements}
           progression={progression}
+          desiredLevel={desiredLevel}
         />
       </div>
 
@@ -413,6 +440,7 @@ export default function HeroExpCalculator({
         totalExp={totalExp}
         progression={progression}
         startLevel={startLevel}
+        desiredLevel={desiredLevel}
       />
     </div>
   );

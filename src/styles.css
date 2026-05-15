@@ -1141,8 +1141,18 @@ h1 {
 }
 
 .hero-exp-overview-top {
-    grid-template-columns: 180px minmax(0, 1fr);
+    grid-template-columns: auto minmax(0, 1fr);
     align-items: end;
+}
+
+.hero-exp-level-controls {
+    display: flex;
+    gap: 10px;
+}
+
+.hero-exp-level-controls .hero-exp-control {
+    flex: 1;
+    min-width: 0;
 }
 
 .hero-exp-kpi-strip {
@@ -1202,6 +1212,43 @@ h1 {
 .hero-level-select:focus {
     border-color: #6d8cff;
     box-shadow: 0 0 0 3px rgba(109, 140, 255, 0.2);
+}
+
+.hero-exp-autocomplete {
+    position: relative;
+}
+
+.hero-level-dropdown {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    z-index: 50;
+    margin: 0;
+    padding: 4px;
+    list-style: none;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 8px;
+    background: rgba(10, 14, 28, 0.95);
+    overflow-y: auto;
+    max-height: 320px;
+}
+
+.hero-level-option {
+    padding: 8px 12px;
+    border-radius: 6px;
+    color: #d9def7;
+    cursor: pointer;
+    font-size: 0.9rem;
+}
+
+.hero-level-option-highlighted {
+    background: rgba(109, 140, 255, 0.2);
+    color: #ffffff;
+}
+
+.hero-level-option:hover {
+    background: rgba(109, 140, 255, 0.15);
 }
 
 .hero-exp-progress-grid {

@@ -15,13 +15,16 @@ type HeroExpSidebarProps = {
   totalExp: Decimal;
   progression: {
     expStillNeededToMax: Decimal;
+    expStillNeededToDesired: Decimal;
     spentExp: Decimal;
     remainingExp: Decimal;
     nextLevelCost: Decimal;
     expNeededForNextLevel: Decimal;
     expToMax: Decimal;
+    expToDesired: Decimal;
   };
   startLevel: number;
+  desiredLevel: number;
 };
 
 export function HeroExpSidebar({
@@ -31,6 +34,7 @@ export function HeroExpSidebar({
   totalExp,
   progression,
   startLevel,
+  desiredLevel,
 }: HeroExpSidebarProps) {
   return (
     <aside className="hero-exp-sidebar">
@@ -38,7 +42,7 @@ export function HeroExpSidebar({
         <div className="hero-section-heading hero-section-heading-tight">
           <div>
             <p className="hero-section-label">Level path</p>
-            <h2>Start to max</h2>
+            <h2>Start to {desiredLevel >= 150 ? "max" : `level ${desiredLevel}`}</h2>
           </div>
           <div className="hero-level-legend" aria-label="Level state legend">
             <span className="hero-level-legend-item">
@@ -82,6 +86,10 @@ export function HeroExpSidebar({
             <strong>{formatWholeDecimal(totalExp)}</strong>
           </section>
           <section className="hero-exp-stat-card">
+            <span>EXP still to {desiredLevel >= 150 ? "150" : `level ${desiredLevel}`}</span>
+            <strong>{formatWholeDecimal(progression.expStillNeededToDesired)}</strong>
+          </section>
+          <section className="hero-exp-stat-card">
             <span>EXP still to 150</span>
             <strong>{formatWholeDecimal(progression.expStillNeededToMax)}</strong>
           </section>
@@ -103,6 +111,10 @@ export function HeroExpSidebar({
           <div className="grand-total">
             <span>EXP still needed for next</span>
             <strong>{formatWholeDecimal(progression.expNeededForNextLevel)}</strong>
+          </div>
+          <div className="grand-total">
+            <span>EXP needed from level {startLevel} to {desiredLevel}</span>
+            <strong>{formatWholeDecimal(progression.expToDesired)}</strong>
           </div>
           <div className="grand-total">
             <span>EXP needed from level {startLevel} to 150</span>

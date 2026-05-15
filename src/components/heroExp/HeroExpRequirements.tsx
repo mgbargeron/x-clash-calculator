@@ -7,6 +7,7 @@ type ChestRequirement = {
   chestValue: Decimal;
   toNext: Decimal;
   toMax: Decimal;
+  toDesired: Decimal;
 };
 
 type HeroExpRequirementsProps = {
@@ -14,9 +15,14 @@ type HeroExpRequirementsProps = {
   progression: {
     achievedLevel: number;
   };
+  desiredLevel: number;
 };
 
-export function HeroExpRequirements({ chestRequirements, progression }: HeroExpRequirementsProps) {
+export function HeroExpRequirements({
+  chestRequirements,
+  progression,
+  desiredLevel,
+}: HeroExpRequirementsProps) {
   return (
     <section className="hero-surface">
       <div className="hero-section-heading">
@@ -38,6 +44,12 @@ export function HeroExpRequirements({ chestRequirements, progression }: HeroExpR
                 : requirement.chestValue.lte(0)
                   ? "Set chest value"
                   : formatWholeDecimal(requirement.toNext)}
+            </span>
+            <span>
+              To {desiredLevel}:{" "}
+              {requirement.chestValue.gt(0)
+                ? formatWholeDecimal(requirement.toDesired)
+                : "Set chest value"}
             </span>
             <span>
               To 150:{" "}
