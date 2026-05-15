@@ -1,23 +1,27 @@
 import {useEffect, useMemo, useRef, useState, type ReactNode} from "react";
-import ServerWeekView from "../components/serverTime/ServerWeekView";
 
+import EventPlannerDialog from "../components/serverTime/EventPlannerDialog";
+import ServerWeekView from "../components/serverTime/ServerWeekView";
 import {
+  type AlternatingWeek,
   CURATED_TIMEZONES,
   DEFAULT_SERVER_TIME_STATE,
-  getCurrentServerWeekStart,
-  createPlannerEvent,
   formatDuration,
   formatLocalDateTime,
   formatNowInZone,
   formatServerClock,
-  formatServerDay,
   formatTimeInZone,
+  getCurrentServerDateString,
+  getCurrentServerWeekStart,
+  getEventScheduleSummary,
   getNextEventOccurrence,
+  getResolvedAlternatingWeekState,
   getServerContext,
   normalizePlannerState,
   sanitizeTimeInput,
   type PlannerEvent,
   type ServerTimePlannerState,
+  type ServerWeekHour,
 } from "../utils/serverTime";
 
 const STORAGE_KEY = "server-time-planner-v1";
@@ -38,6 +42,9 @@ export default function ServerTimePage({navigation}: ServerTimePageProps) {
   const [plannerState, setPlannerState] = useState<ServerTimePlannerState>(DEFAULT_SERVER_TIME_STATE);
   const [isLoaded, setIsLoaded] = useState(false);
   const [now, setNow] = useState(() => new Date());
+  const [eventsPanelOpen, setEventsPanelOpen] = useState(false);
+  const [dialogSlot, setDialogSlot] = useState<ServerWeekHour | null>(null);
+  const [editingEventId, setEditingEventId] = useState<string | null>(null);
   const lastNotifiedAlarmRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -75,9 +82,45 @@ export default function ServerTimePage({navigation}: ServerTimePageProps) {
   }, []);
 
   useEffect(() => {
-    const timer = window.setInterval(() => setNow(new Date()), 1000);
-    return () => window.clearInterval(timer);
+    const refreshNow = () => setNow(new Date());
+    const timer = window.setInterval(refreshNow, 60_000);
+    const onFocus = () => refreshNow();
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") refreshNow();
+    };
+
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
   }, []);
+
+  useEffect(() => {
+    if (!isLoaded) return;
+
+    setPlannerState((current) => {
+      const alternatingWeekState = getResolvedAlternatingWeekState(current, now);
+      const existing = current.alternatingWeekState;
+
+      if (
+        existing?.anchorServerDate === alternatingWeekState?.anchorServerDate &&
+        existing?.anchorWeek === alternatingWeekState?.anchorWeek &&
+        existing?.lastResolvedServerDate === alternatingWeekState?.lastResolvedServerDate &&
+        existing?.currentWeek === alternatingWeekState?.currentWeek
+      ) {
+        return current;
+      }
+
+      return {
+        ...current,
+        alternatingWeekState,
+      };
+    });
+  }, [isLoaded, now]);
 
   useEffect(() => {
     if (!isLoaded) return;
@@ -100,29 +143,35 @@ export default function ServerTimePage({navigation}: ServerTimePageProps) {
     [now, plannerState.settings]
   );
 
+  const alternatingWeekState = useMemo(
+    () => getResolvedAlternatingWeekState(plannerState, now),
+    [plannerState, now]
+  );
+
   const eventRows = useMemo(() => {
     return plannerState.events.map((event) => {
-      const nextOccurrence = getNextEventOccurrence(event, now, plannerState.settings);
-      const alarmKey = `${event.id}:${nextOccurrence.toISOString()}`;
+      const nextOccurrence = getNextEventOccurrence(event, plannerState, now);
+      const alarmKey = nextOccurrence ? `${event.id}:${nextOccurrence.toISOString()}` : `${event.id}:none`;
+
       return {
         event,
         nextOccurrence,
-        countdown: formatDuration(nextOccurrence.getTime() - now.getTime()),
+        countdown: nextOccurrence ? formatDuration(nextOccurrence.getTime() - now.getTime()) : "Not scheduled",
         alarmKey,
       };
     });
-  }, [now, plannerState.events, plannerState.settings]);
+  }, [now, plannerState]);
 
   const upcomingAlarm = useMemo<UpcomingAlarm | null>(() => {
     if (plannerState.settings.alarmsMuted) return null;
 
     const candidates = eventRows
-      .filter(({event}) => event.enabled && event.alarmEnabled)
+      .filter(({event, nextOccurrence}) => event.enabled && event.alarmEnabled && nextOccurrence)
       .map(({event, nextOccurrence, alarmKey}) => ({
         event,
         alarmKey,
-        occurrence: nextOccurrence,
-        triggerAt: new Date(nextOccurrence.getTime() - event.alarmLeadMinutes * 60_000),
+        occurrence: nextOccurrence!,
+        triggerAt: new Date(nextOccurrence!.getTime() - event.alarmLeadMinutes * 60_000),
       }))
       .filter(({triggerAt, alarmKey}) =>
         triggerAt.getTime() <= now.getTime() &&
@@ -162,7 +211,9 @@ export default function ServerTimePage({navigation}: ServerTimePageProps) {
   function updateEvent(eventId: string, updater: (current: PlannerEvent) => PlannerEvent) {
     setPlannerState((current) => ({
       ...current,
-      events: current.events.map((event) => (event.id === eventId ? updater(event) : event)),
+      events: current.events.map((event) =>
+        event.id === eventId ? ensureAlternatingDefaults(updater(event), current, now) : event
+      ),
     }));
   }
 
@@ -176,10 +227,8 @@ export default function ServerTimePage({navigation}: ServerTimePageProps) {
   }
 
   function addEvent() {
-    setPlannerState((current) => ({
-      ...current,
-      events: [...current.events, createPlannerEvent(current.settings.defaultAlarmLeadMinutes)],
-    }));
+    setDialogSlot(null);
+    setEditingEventId(null);
   }
 
   function removeEvent(eventId: string) {
@@ -208,6 +257,37 @@ export default function ServerTimePage({navigation}: ServerTimePageProps) {
     });
   }
 
+  function createEventFromSlot(slot: ServerWeekHour) {
+    setDialogSlot(slot);
+    setEditingEventId(null);
+  }
+
+  function closeDialog() {
+    setDialogSlot(null);
+    setEditingEventId(null);
+  }
+
+  function saveDialogEvent(event: PlannerEvent) {
+    setPlannerState((current) => {
+      const nextEvent = ensureAlternatingDefaults(event, current, now);
+      const exists = current.events.some((item) => item.id === nextEvent.id);
+
+      return {
+        ...current,
+        events: exists
+          ? current.events.map((item) => (item.id === nextEvent.id ? nextEvent : item))
+          : [...current.events, nextEvent],
+      };
+    });
+    setEventsPanelOpen(true);
+    closeDialog();
+  }
+
+  function editEvent(eventId: string) {
+    setEditingEventId(eventId);
+    setDialogSlot(null);
+  }
+
   const groupedTimezones = useMemo(() => {
     return CURATED_TIMEZONES.reduce<Record<string, typeof CURATED_TIMEZONES>>((groups, zone) => {
       groups[zone.region] ??= [];
@@ -220,6 +300,10 @@ export default function ServerTimePage({navigation}: ServerTimePageProps) {
     () => getCurrentServerWeekStart(now, plannerState.settings),
     [now, plannerState.settings]
   );
+  const editingEvent = useMemo(
+    () => plannerState.events.find((event) => event.id === editingEventId) ?? null,
+    [editingEventId, plannerState.events]
+  );
 
   return (
     <section className="card calculator server-time-page">
@@ -228,13 +312,13 @@ export default function ServerTimePage({navigation}: ServerTimePageProps) {
           <p className="eyebrow">Server planning</p>
           <h1>Server Time Dashboard</h1>
           <p className="description">
-            Keep reset timing, shared timezone references, and event alarms in one view.
+            Click a calendar slot to create an event, then choose whether it is one-time, daily, every other day, or weekly.
           </p>
         </div>
         {navigation}
       </div>
 
-      <div className="server-time-summary">
+      <div className="server-time-summary server-time-summary--wide">
         <div className="server-time-stat">
           <span className="server-time-stat-label">Local Time</span>
           <strong>{now.toLocaleTimeString()}</strong>
@@ -244,13 +328,18 @@ export default function ServerTimePage({navigation}: ServerTimePageProps) {
           <span className="server-time-stat-label">Server Time</span>
           <strong>{formatServerClock(serverContext.serverMinutes)}</strong>
           <small>
-            Server `00:00:00` = {new Date(serverContext.lastReset).toLocaleTimeString([], {hour: "numeric", minute: "2-digit"})} local
+            Server `00:00:00` = {serverContext.lastReset.toLocaleTimeString([], {hour: "numeric", minute: "2-digit"})} local
           </small>
         </div>
         <div className="server-time-stat">
           <span className="server-time-stat-label">Next Reset</span>
           <strong>{formatLocalDateTime(serverContext.nextReset)}</strong>
           <small>{formatDuration(serverContext.nextReset.getTime() - now.getTime())}</small>
+        </div>
+        <div className="server-time-stat">
+          <span className="server-time-stat-label">Current Alt Day</span>
+          <strong>{alternatingWeekState?.currentWeek ?? "Not Set"}</strong>
+          <small>{alternatingWeekState ? `Anchor ${alternatingWeekState.anchorWeek} · ${alternatingWeekState.anchorServerDate}` : "Created from the first every-other-day event"}</small>
         </div>
         <button
           className={`mute-alarms-button ${plannerState.settings.alarmsMuted ? "active" : ""}`}
@@ -328,28 +417,44 @@ export default function ServerTimePage({navigation}: ServerTimePageProps) {
 
           <div className="server-time-panel-header">
             <h2>Team Timezones</h2>
-            <small>{plannerState.settings.extraTimezones.length}/{MAX_TIMEZONES} selected</small>
+            <div className="server-time-panel-actions">
+              <small>{plannerState.settings.extraTimezones.length}/{MAX_TIMEZONES} selected</small>
+              <button
+                className="secondary-button"
+                type="button"
+                onClick={() =>
+                  updateSettings((current) => ({
+                    ...current,
+                    timezoneSelectorCollapsed: !current.timezoneSelectorCollapsed,
+                  }))
+                }
+              >
+                {plannerState.settings.timezoneSelectorCollapsed ? "Show Timezones" : "Hide Timezones"}
+              </button>
+            </div>
           </div>
 
-          <div className="timezone-selector-groups">
-            {Object.entries(groupedTimezones).map(([region, zones]) => (
-              <div className="timezone-selector-group" key={region}>
-                <strong>{region}</strong>
-                <div className="timezone-selector-list">
-                  {zones.map((zone) => (
-                    <label className="timezone-option" key={zone.value}>
-                      <input
-                        type="checkbox"
-                        checked={plannerState.settings.extraTimezones.includes(zone.value)}
-                        onChange={() => toggleTimezone(zone.value)}
-                      />
-                      <span>{zone.label}</span>
-                    </label>
-                  ))}
+          {!plannerState.settings.timezoneSelectorCollapsed ? (
+            <div className="timezone-selector-groups">
+              {Object.entries(groupedTimezones).map(([region, zones]) => (
+                <div className="timezone-selector-group" key={region}>
+                  <strong>{region}</strong>
+                  <div className="timezone-selector-list">
+                    {zones.map((zone) => (
+                      <label className="timezone-option" key={zone.value}>
+                        <input
+                          type="checkbox"
+                          checked={plannerState.settings.extraTimezones.includes(zone.value)}
+                          onChange={() => toggleTimezone(zone.value)}
+                        />
+                        <span>{zone.label}</span>
+                      </label>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : null}
         </section>
 
         <section className="server-time-panel">
@@ -382,165 +487,121 @@ export default function ServerTimePage({navigation}: ServerTimePageProps) {
         settings={plannerState.settings}
         events={plannerState.events}
         selectedTimezones={plannerState.settings.extraTimezones}
+        alternatingWeekState={alternatingWeekState}
+        onSelectSlot={createEventFromSlot}
+        onRemoveEvent={removeEvent}
       />
 
       <section className="server-time-panel">
         <div className="server-time-panel-header">
-          <h2>Server Events</h2>
-          <button className="secondary-button" type="button" onClick={addEvent}>
-            Add Event
-          </button>
+          <div>
+            <h2>Server Events</h2>
+            <small>Upcoming, repeating, every-other-day, and weekly schedules</small>
+          </div>
+          <div className="server-time-panel-actions">
+            <button className="secondary-button" type="button" onClick={addEvent}>
+              New Event
+            </button>
+            <button
+              className="secondary-button"
+              type="button"
+              onClick={() => setEventsPanelOpen((current) => !current)}
+            >
+              {eventsPanelOpen ? "Hide Events" : `Show Events (${plannerState.events.length})`}
+            </button>
+          </div>
         </div>
 
-        <div className="event-list">
-          <div className="event-row event-row--header">
-            <span>Name</span>
-            <span>Server Schedule</span>
-            <span>Note</span>
-            <span>Local Conversion</span>
-            <span>Alarm</span>
-            <span></span>
-          </div>
-          {eventRows.map(({event, nextOccurrence, countdown, alarmKey}) => (
-            <div className="event-row" key={event.id}>
-              <div className="event-main-fields">
-                <input
-                  className="cell-input"
-                  type="text"
-                  placeholder="Event name"
-                  value={event.name}
-                  onChange={(inputEvent) =>
-                    updateEvent(event.id, (current) => ({
-                      ...current,
-                      name: inputEvent.target.value,
-                    }))
-                  }
-                />
-                <div className="event-schedule-fields">
-                  <select
-                    className="cell-input"
-                    value={event.cadence}
-                    onChange={(inputEvent) =>
+        {eventsPanelOpen ? (
+          <div className="event-list event-list--summary">
+            {eventRows.map(({event, nextOccurrence, countdown, alarmKey}) => (
+              <div className="event-card" key={event.id}>
+                <div className="event-card-header">
+                  <div>
+                    <strong>{event.name || "Unnamed event"}</strong>
+                    <small>{getEventScheduleSummary(event, alternatingWeekState)}</small>
+                  </div>
+                  <span className={`event-card-state ${event.enabled ? "active" : "muted"}`}>
+                    {event.enabled ? "Enabled" : "Disabled"}
+                  </span>
+                </div>
+                <div className="event-card-body">
+                  <div className="event-card-stat">
+                    <span>Next Local</span>
+                    <strong>{nextOccurrence ? formatLocalDateTime(nextOccurrence) : "No upcoming occurrence"}</strong>
+                  </div>
+                  <div className="event-card-stat">
+                    <span>Countdown</span>
+                    <strong>{countdown}</strong>
+                  </div>
+                  <div className="event-card-stat">
+                    <span>Alarm</span>
+                    <strong>{event.alarmEnabled ? `${event.alarmLeadMinutes}m` : "Off"}</strong>
+                  </div>
+                  <div className="event-card-stat">
+                    <span>Note</span>
+                    <strong>{event.note || "None"}</strong>
+                  </div>
+                </div>
+                <div className="event-card-actions">
+                  <button className="secondary-button" type="button" onClick={() => editEvent(event.id)}>
+                    Edit
+                  </button>
+                  <button
+                    className="secondary-button"
+                    type="button"
+                    onClick={() =>
                       updateEvent(event.id, (current) => ({
                         ...current,
-                        cadence: inputEvent.target.value === "weekly" ? "weekly" : "daily",
+                        enabled: !current.enabled,
                       }))
                     }
                   >
-                    <option value="daily">Daily</option>
-                    <option value="weekly">Weekly</option>
-                  </select>
-                  {event.cadence === "weekly" ? (
-                    <select
-                      className="cell-input"
-                      value={event.serverDayOfWeek}
-                      onChange={(inputEvent) =>
-                        updateEvent(event.id, (current) => ({
-                          ...current,
-                          serverDayOfWeek: Number(inputEvent.target.value),
-                        }))
-                      }
-                    >
-                      {[0, 1, 2, 3, 4, 5, 6].map((day) => (
-                        <option key={day} value={day}>
-                          {formatServerDay(day)}
-                        </option>
-                      ))}
-                    </select>
-                  ) : null}
-                  <input
-                    className="cell-input"
-                    type="time"
-                    value={event.serverTime}
-                    onChange={(inputEvent) =>
-                      updateEvent(event.id, (current) => ({
-                        ...current,
-                        serverTime: sanitizeTimeInput(inputEvent.target.value),
-                      }))
-                    }
-                  />
+                    {event.enabled ? "Disable" : "Enable"}
+                  </button>
+                  <button className="secondary-button" type="button" onClick={() => acknowledgeAlarm(alarmKey)}>
+                    Clear Alarm
+                  </button>
+                  <button className="secondary-button reset-button" type="button" onClick={() => removeEvent(event.id)}>
+                    Remove
+                  </button>
                 </div>
               </div>
-              <textarea
-                className="cell-input server-time-textarea"
-                placeholder="Note"
-                value={event.note}
-                onChange={(inputEvent) =>
-                  updateEvent(event.id, (current) => ({
-                    ...current,
-                    note: inputEvent.target.value,
-                  }))
-                }
-              />
-              <div className="event-timing">
-                <strong>{formatLocalDateTime(nextOccurrence)}</strong>
-                <small>
-                  Server {formatServerDay(event.serverDayOfWeek)} {event.serverTime}
-                  {event.cadence === "daily" ? " daily" : ""} · {countdown}
-                </small>
-              </div>
-              <div className="event-alarms">
-                <label className="server-time-toggle">
-                  <input
-                    type="checkbox"
-                    checked={event.enabled}
-                    onChange={(inputEvent) =>
-                      updateEvent(event.id, (current) => ({
-                        ...current,
-                        enabled: inputEvent.target.checked,
-                      }))
-                    }
-                  />
-                  <span>Enabled</span>
-                </label>
-                <label className="server-time-toggle">
-                  <input
-                    type="checkbox"
-                    checked={event.alarmEnabled}
-                    onChange={(inputEvent) =>
-                      updateEvent(event.id, (current) => ({
-                        ...current,
-                        alarmEnabled: inputEvent.target.checked,
-                      }))
-                    }
-                  />
-                  <span>Alarm</span>
-                </label>
-                <input
-                  className="cell-input"
-                  type="number"
-                  min="0"
-                  max="1440"
-                  value={event.alarmLeadMinutes}
-                  onChange={(inputEvent) =>
-                    updateEvent(event.id, (current) => ({
-                      ...current,
-                      alarmLeadMinutes: Number(inputEvent.target.value) > 0 ? Number(inputEvent.target.value) : 0,
-                    }))
-                  }
-                />
-                <small>Dismissed: {plannerState.acknowledgedAlarmKeys.includes(alarmKey) ? "Yes" : "No"}</small>
-              </div>
-              <div className="event-actions">
-                <button
-                  className="secondary-button"
-                  type="button"
-                  onClick={() => acknowledgeAlarm(alarmKey)}
-                >
-                  Clear Alarm
-                </button>
-                <button
-                  className="secondary-button reset-button"
-                  type="button"
-                  onClick={() => removeEvent(event.id)}
-                >
-                  Remove
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        ) : null}
       </section>
+
+      <EventPlannerDialog
+        open={dialogSlot !== null || editingEvent !== null}
+        slot={dialogSlot}
+        event={editingEvent}
+        plannerState={plannerState}
+        onClose={closeDialog}
+        onSave={saveDialogEvent}
+      />
     </section>
   );
+}
+
+function ensureAlternatingDefaults(
+  event: PlannerEvent,
+  plannerState: ServerTimePlannerState,
+  now: Date
+): PlannerEvent {
+  if (event.type !== "alternating") {
+    return event;
+  }
+
+  return {
+    ...event,
+    alternatingAnchorDate:
+      event.alternatingAnchorDate ||
+      plannerState.alternatingWeekState?.anchorServerDate ||
+      getCurrentServerDateString(now, plannerState.settings),
+    alternatingWeek:
+      event.alternatingWeek ||
+      plannerState.alternatingWeekState?.currentWeek ||
+      "A",
+  } as PlannerEvent & {alternatingWeek: AlternatingWeek};
 }
