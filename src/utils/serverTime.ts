@@ -31,6 +31,18 @@ export type ServerTimePlannerState = {
   acknowledgedAlarmKeys: string[];
 };
 
+export type ServerWeekHour = {
+  key: string;
+  serverDayOfWeek: number;
+  serverHour: number;
+  serverLabel: string;
+  localDate: Date;
+  localLabel: string;
+  timezoneLabels: Record<string, string>;
+  isCurrentHour: boolean;
+  matchingEvents: PlannerEvent[];
+};
+
 export const DEFAULT_SERVER_TIME_STATE: ServerTimePlannerState = {
   settings: {
     resetTime: "19:00",
@@ -167,6 +179,11 @@ export function formatServerClock(serverMinutes: number): string {
   return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:00`;
 }
 
+export function getCurrentServerWeekStart(now: Date, settings: ServerTimeSettings): Date {
+  const context = getServerContext(now, settings);
+  return new Date(context.lastReset.getTime() - context.serverDayOfWeek * MINUTES_PER_DAY * 60_000);
+}
+
 export function getNextEventOccurrence(
   event: PlannerEvent,
   now: Date,
@@ -241,6 +258,54 @@ export function formatServerDay(day: number): string {
   return DAYS[((day % 7) + 7) % 7];
 }
 
+export function formatTimeOnly(date: Date): string {
+  return new Intl.DateTimeFormat(undefined, {
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(date);
+}
+
+export function buildServerWeekHours(
+  weekStart: Date,
+  now: Date,
+  settings: ServerTimeSettings,
+  events: PlannerEvent[],
+  selectedTimezones: string[]
+): ServerWeekHour[][] {
+  const currentContext = getServerContext(now, settings);
+
+  return Array.from({length: 7}, (_, dayIndex) =>
+    Array.from({length: 24}, (_, hour) => {
+      const localDate = new Date(weekStart.getTime() + (dayIndex * 24 + hour) * 60 * 60_000);
+      const serverLabel = `${String(hour).padStart(2, "0")}:00`;
+      const timezoneLabels = selectedTimezones.reduce<Record<string, string>>((acc, timezone) => {
+        acc[timezone] = formatTimeOnlyInZone(localDate, timezone);
+        return acc;
+      }, {});
+      const matchingEvents = events.filter((event) => {
+        if (!event.enabled) return false;
+        if (parseTimeToMinutes(event.serverTime) < hour * 60 || parseTimeToMinutes(event.serverTime) >= (hour + 1) * 60) {
+          return false;
+        }
+
+        return event.cadence === "daily" || event.serverDayOfWeek === dayIndex;
+      });
+
+      return {
+        key: `${dayIndex}-${hour}`,
+        serverDayOfWeek: dayIndex,
+        serverHour: hour,
+        serverLabel,
+        localDate,
+        localLabel: formatTimeOnly(localDate),
+        timezoneLabels,
+        isCurrentHour: currentContext.serverDayOfWeek === dayIndex && Math.floor(currentContext.serverMinutes / 60) === hour,
+        matchingEvents,
+      };
+    })
+  );
+}
+
 export function normalizePlannerState(raw: unknown): ServerTimePlannerState {
   const base = DEFAULT_SERVER_TIME_STATE;
   const input = raw && typeof raw === "object" ? raw as Partial<ServerTimePlannerState> : {};
@@ -301,4 +366,12 @@ function normalizeTimezones(raw: unknown): string[] {
   const values = Array.isArray(raw) ? raw.filter((value): value is string => typeof value === "string") : [];
   const deduped = Array.from(new Set(values.filter((value) => allowed.has(value))));
   return deduped.length > 0 ? deduped : DEFAULT_SERVER_TIME_STATE.settings.extraTimezones;
+}
+
+function formatTimeOnlyInZone(date: Date, timezone: string): string {
+  return new Intl.DateTimeFormat(undefined, {
+    timeZone: timezone,
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(date);
 }

@@ -1,8 +1,10 @@
 import {useEffect, useMemo, useRef, useState, type ReactNode} from "react";
+import ServerWeekView from "../components/serverTime/ServerWeekView";
 
 import {
   CURATED_TIMEZONES,
   DEFAULT_SERVER_TIME_STATE,
+  getCurrentServerWeekStart,
   createPlannerEvent,
   formatDuration,
   formatLocalDateTime,
@@ -214,6 +216,11 @@ export default function ServerTimePage({navigation}: ServerTimePageProps) {
     }, {});
   }, []);
 
+  const serverWeekStart = useMemo(
+    () => getCurrentServerWeekStart(now, plannerState.settings),
+    [now, plannerState.settings]
+  );
+
   return (
     <section className="card calculator server-time-page">
       <div className="page-title-row">
@@ -368,6 +375,14 @@ export default function ServerTimePage({navigation}: ServerTimePageProps) {
           </div>
         </section>
       </div>
+
+      <ServerWeekView
+        weekStart={serverWeekStart}
+        now={now}
+        settings={plannerState.settings}
+        events={plannerState.events}
+        selectedTimezones={plannerState.settings.extraTimezones}
+      />
 
       <section className="server-time-panel">
         <div className="server-time-panel-header">
