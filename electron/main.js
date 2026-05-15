@@ -3,6 +3,7 @@ const fs = require('fs/promises')
 const path = require('path')
 
 const mapDataPath = () => path.join(app.getPath('userData'), 'game-map-data.json')
+const serverTimeDataPath = () => path.join(app.getPath('userData'), 'server-time-data.json')
 
 ipcMain.handle('map-storage:get', async () => {
   try {
@@ -25,6 +26,31 @@ ipcMain.handle('map-storage:set', async (_event, data) => {
     return { ok: true }
   } catch (error) {
     console.error('Failed to save map data', error)
+    return { ok: false, error: error.message }
+  }
+})
+
+ipcMain.handle('server-time-storage:get', async () => {
+  try {
+    const raw = await fs.readFile(serverTimeDataPath(), 'utf8')
+    return JSON.parse(raw)
+  } catch (error) {
+    if (error.code === 'ENOENT') {
+      return null
+    }
+
+    console.error('Failed to read server time data', error)
+    return null
+  }
+})
+
+ipcMain.handle('server-time-storage:set', async (_event, data) => {
+  try {
+    await fs.mkdir(path.dirname(serverTimeDataPath()), { recursive: true })
+    await fs.writeFile(serverTimeDataPath(), JSON.stringify(data, null, 2), 'utf8')
+    return { ok: true }
+  } catch (error) {
+    console.error('Failed to save server time data', error)
     return { ok: false, error: error.message }
   }
 })

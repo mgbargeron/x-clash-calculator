@@ -5,7 +5,6 @@ import { sanitizeNumericInput } from "../../utils/sanatizeNumericInput";
 import { toDecimal } from "../../utils/toDecimal";
 import { useLocalStorage } from "../../hooks/useLocalStorage";
 import { useInitialRowsSync } from "../../hooks/useInitialRowsSync";
-import { useScrollToElement } from "../../hooks/useScrollToElement";
 import { HeroExpChestValues } from "./HeroExpChestValues";
 import { HeroExpOverview } from "./HeroExpOverview";
 import { HeroExpInputGrid } from "./HeroExpInputGrid";

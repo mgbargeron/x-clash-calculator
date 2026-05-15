@@ -3,6 +3,7 @@ import {sanitizeNumericInput} from "./utils/sanatizeNumericInput";
 import CalculatorPage from "./pages/CalculatorPage";
 import HeroExpPage from "./pages/HeroExpPage";
 import GameMapPage from "./pages/GameMapPage";
+import ServerTimePage from "./pages/ServerTimePage";
 
 const GRID_STORAGE_KEY = "chest-grid-values-v1";
 
@@ -12,7 +13,7 @@ const DEFAULT_GRID_VALUES: string[][] = [
   ["", "", ""],
 ];
 
-type Page = "calculator" | "heroExp" | "map";
+type Page = "calculator" | "heroExp" | "map" | "serverTime";
 
 function loadInitialGridValues(): string[][] {
   try {
@@ -80,6 +81,13 @@ export default function App() {
       >
         Game Map
       </button>
+      <button
+        className={`nav-button ${page === "serverTime" ? "active" : ""}`}
+        type="button"
+        onClick={() => setPage("serverTime")}
+      >
+        Server Time
+      </button>
     </nav>
   );
 
@@ -97,8 +105,10 @@ export default function App() {
           updateGridCell={updateGridCell}
           navigation={navigation}
         />
-      ) : (
+      ) : page === "map" ? (
         <GameMapPage navigation={navigation} />
+      ) : (
+        <ServerTimePage navigation={navigation} />
       )}
     </main>
   );

@@ -37,6 +37,12 @@ Electron 41 + React 19 + Vite 8 + TypeScript (strict). Single package, no monore
 - Main process persists `game-map-data.json` in Electron's `userData` directory.
 - Dev mode loads Vite dev server URL; production loads `dist/index.html`.
 
+## Server time
+- Server time is defined by a single user-entered local reset time: ask "what time does server reset for you?"
+- That reset time maps to server `00:00:00` exactly.
+- Example: if reset is `7:00 PM` local, then `7:00 PM = server 00:00:00` and `8:00 PM = server 01:00:00`.
+- Server event alarms should be configured in server time first, then converted to the user's local time and selected team timezones for display.
+
 ## Map identity
 - Game map team references must use stable team `id`, not mutable display fields (color, name, code).
 - Map tiles, toolbar selection state, and score summaries should join rivals/enemies by team id only.

@@ -130,6 +130,226 @@ body {
     gap: 20px;
 }
 
+.server-time-page {
+    gap: 16px;
+}
+
+.server-time-summary {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(220px, auto);
+    gap: 12px;
+    align-items: stretch;
+}
+
+.server-time-stat,
+.server-time-panel,
+.server-time-alert {
+    display: grid;
+    gap: 8px;
+    padding: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 12px;
+    background: rgba(7, 10, 20, 0.52);
+}
+
+.server-time-stat strong,
+.server-time-panel h2 {
+    margin: 0;
+    font-size: 1.05rem;
+}
+
+.server-time-stat-label {
+    font-size: 0.8rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #9db1ff;
+}
+
+.mute-alarms-button {
+    min-height: 100%;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 123, 132, 0.4);
+    background: rgba(207, 63, 69, 0.22);
+    color: #fff2f3;
+    font: inherit;
+    font-weight: 900;
+    cursor: pointer;
+    padding: 18px 20px;
+}
+
+.mute-alarms-button.active {
+    background: rgba(120, 126, 150, 0.24);
+    border-color: rgba(157, 177, 255, 0.4);
+}
+
+.server-time-alert {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+}
+
+.server-time-alert p {
+    margin: 4px 0 0;
+    color: #d9def7;
+}
+
+.server-time-grid {
+    display: grid;
+    grid-template-columns: minmax(320px, 420px) minmax(0, 1fr);
+    gap: 16px;
+    align-items: start;
+}
+
+.server-time-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.server-time-panel-header h2 {
+    font-size: 1rem;
+}
+
+.server-time-panel-header small,
+.server-time-stat small,
+.event-timing small,
+.event-alarms small {
+    color: #b9c7ff;
+}
+
+.server-time-form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.server-time-field {
+    display: grid;
+    gap: 6px;
+    min-width: 0;
+}
+
+.server-time-field span,
+.server-time-toggle span {
+    font-size: 0.84rem;
+    font-weight: 700;
+    color: #dfe6ff;
+}
+
+.server-time-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 40px;
+}
+
+.timezone-selector-groups {
+    display: grid;
+    gap: 12px;
+}
+
+.timezone-selector-group {
+    display: grid;
+    gap: 8px;
+}
+
+.timezone-selector-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 12px;
+}
+
+.timezone-option {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 28px;
+}
+
+.timezone-board,
+.event-list {
+    display: grid;
+    gap: 10px;
+}
+
+.timezone-board-row {
+    display: grid;
+    grid-template-columns: minmax(170px, 1.2fr) repeat(3, minmax(0, 1fr));
+    gap: 10px;
+    align-items: center;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.timezone-board-row--header,
+.event-row--header {
+    font-size: 0.76rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #9db1ff;
+    background: transparent;
+    border-style: dashed;
+}
+
+.event-row {
+    display: grid;
+    grid-template-columns: minmax(280px, 1.25fr) minmax(180px, 0.9fr) minmax(170px, 0.9fr) minmax(160px, 0.75fr) auto;
+    gap: 12px;
+    align-items: start;
+    padding: 12px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.event-main-fields,
+.event-schedule-fields,
+.event-timing,
+.event-alarms,
+.event-actions {
+    display: grid;
+    gap: 8px;
+}
+
+.event-schedule-fields {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.server-time-textarea {
+    min-height: 94px;
+    resize: vertical;
+}
+
+.event-actions {
+    align-self: stretch;
+    justify-items: end;
+}
+
+@media (max-width: 1100px) {
+    .server-time-summary,
+    .server-time-grid,
+    .event-row {
+        grid-template-columns: 1fr;
+    }
+
+    .event-row--header,
+    .timezone-board-row--header {
+        display: none;
+    }
+}
+
+@media (max-width: 720px) {
+    .server-time-form-grid,
+    .event-schedule-fields,
+    .timezone-board-row {
+        grid-template-columns: 1fr;
+    }
+}
+
 .map-page {
     display: grid;
     gap: 14px;
