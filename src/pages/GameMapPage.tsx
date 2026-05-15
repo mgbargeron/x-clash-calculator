@@ -1,5 +1,5 @@
 import { useEffect, useEffectEvent, useRef, useState } from "react";
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 
 import type { TileMarker, MapTile, OurTeamConfig, RivalTeam, EnemyTeam } from "../components/gameMap/types";
 import { defaultGameMapConfig } from "../utils/gameMapConfig";
@@ -517,6 +517,18 @@ export default function GameMapPage({ navigation }: GameMapPageProps) {
   }
 
   // Render
+  const kbdStyle: CSSProperties = {
+    display: "inline-flex",
+    alignItems: "center",
+    padding: "1px 6px",
+    borderRadius: 4,
+    background: "rgba(255,255,255,0.08)",
+    border: "1px solid rgba(255,255,255,0.12)",
+    fontSize: "0.75rem",
+    fontFamily: "inherit",
+    color: "#c8d4ff",
+  };
+
   return (
     <section className="card map-page">
       <div className="page-title-row">
@@ -526,6 +538,10 @@ export default function GameMapPage({ navigation }: GameMapPageProps) {
         </div>
         {navigation}
       </div>
+      <p style={{ margin: 0, fontSize: "0.8rem", color: "#8a9bc0" }}>
+        Click a tile to select it, then use the toolbar to paint markers.
+        Right-click a tile to clear it. <kbd style={kbdStyle}>Ctrl+Z</kbd> to undo.
+      </p>
 
       <MapToolbar
         clearMarkerCount={clearMarkerCount}
