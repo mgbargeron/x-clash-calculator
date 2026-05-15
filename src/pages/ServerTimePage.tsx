@@ -43,8 +43,12 @@ export default function ServerTimePage({navigation}: ServerTimePageProps) {
   const [isLoaded, setIsLoaded] = useState(false);
   const [now, setNow] = useState(() => new Date());
   const [eventsPanelOpen, setEventsPanelOpen] = useState(false);
+  const [creatingEvent, setCreatingEvent] = useState(false);
   const [dialogSlot, setDialogSlot] = useState<ServerWeekHour | null>(null);
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
+  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission | "unsupported">(
+    typeof Notification === "undefined" ? "unsupported" : Notification.permission
+  );
   const lastNotifiedAlarmRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -152,11 +156,19 @@ export default function ServerTimePage({navigation}: ServerTimePageProps) {
     return plannerState.events.map((event) => {
       const nextOccurrence = getNextEventOccurrence(event, plannerState, now);
       const alarmKey = nextOccurrence ? `${event.id}:${nextOccurrence.toISOString()}` : `${event.id}:none`;
+      const nextAlarmTime = nextOccurrence
+        ? new Date(nextOccurrence.getTime() - event.alarmLeadMinutes * 60_000)
+        : null;
+      const primaryTime = event.alarmEnabled && nextAlarmTime ? nextAlarmTime : nextOccurrence;
+      const primaryLabel = event.alarmEnabled ? "Alarm Fires" : "Next Local";
 
       return {
         event,
         nextOccurrence,
-        countdown: nextOccurrence ? formatDuration(nextOccurrence.getTime() - now.getTime()) : "Not scheduled",
+        nextAlarmTime,
+        primaryTime,
+        primaryLabel,
+        countdown: primaryTime ? formatDuration(primaryTime.getTime() - now.getTime()) : "Not scheduled",
         alarmKey,
       };
     });
@@ -187,6 +199,7 @@ export default function ServerTimePage({navigation}: ServerTimePageProps) {
     if (lastNotifiedAlarmRef.current === upcomingAlarm.alarmKey) return;
 
     lastNotifiedAlarmRef.current = upcomingAlarm.alarmKey;
+    playAlarmChime();
 
     if (typeof Notification !== "undefined" && Notification.permission === "granted") {
       try {
@@ -198,6 +211,20 @@ export default function ServerTimePage({navigation}: ServerTimePageProps) {
       }
     }
   }, [upcomingAlarm]);
+
+  async function enableAlarmNotifications() {
+    if (typeof Notification === "undefined") {
+      setNotificationPermission("unsupported");
+      return;
+    }
+
+    try {
+      const permission = await Notification.requestPermission();
+      setNotificationPermission(permission);
+    } catch {
+      setNotificationPermission(Notification.permission);
+    }
+  }
 
   function updateSettings(
     updater: (current: ServerTimePlannerState["settings"]) => ServerTimePlannerState["settings"]
@@ -227,6 +254,7 @@ export default function ServerTimePage({navigation}: ServerTimePageProps) {
   }
 
   function addEvent() {
+    setCreatingEvent(true);
     setDialogSlot(null);
     setEditingEventId(null);
   }
@@ -258,11 +286,13 @@ export default function ServerTimePage({navigation}: ServerTimePageProps) {
   }
 
   function createEventFromSlot(slot: ServerWeekHour) {
+    setCreatingEvent(false);
     setDialogSlot(slot);
     setEditingEventId(null);
   }
 
   function closeDialog() {
+    setCreatingEvent(false);
     setDialogSlot(null);
     setEditingEventId(null);
   }
@@ -284,6 +314,7 @@ export default function ServerTimePage({navigation}: ServerTimePageProps) {
   }
 
   function editEvent(eventId: string) {
+    setCreatingEvent(false);
     setEditingEventId(eventId);
     setDialogSlot(null);
   }
@@ -344,16 +375,40 @@ export default function ServerTimePage({navigation}: ServerTimePageProps) {
         <button
           className={`mute-alarms-button ${plannerState.settings.alarmsMuted ? "active" : ""}`}
           type="button"
-          onClick={() =>
+          onClick={() => {
+            const nextMuted = !plannerState.settings.alarmsMuted;
+
             updateSettings((current) => ({
               ...current,
-              alarmsMuted: !current.alarmsMuted,
-            }))
-          }
+              alarmsMuted: nextMuted,
+            }));
+
+            if (!nextMuted) {
+              void enableAlarmNotifications();
+            }
+          }}
         >
           {plannerState.settings.alarmsMuted ? "Alarms Muted" : "Mute All Alarms"}
         </button>
       </div>
+
+      {!plannerState.settings.alarmsMuted && notificationPermission !== "granted" ? (
+        <div className="server-time-alert" role="status" aria-live="polite">
+          <div>
+            <strong>Notifications are not enabled</strong>
+            <p>
+              {notificationPermission === "unsupported"
+                ? "This environment does not support desktop notifications. In-app alarm banners and chimes will still work."
+                : "Allow notifications so alarm popups can appear even when the app is not frontmost."}
+            </p>
+          </div>
+          {notificationPermission !== "unsupported" ? (
+            <button className="secondary-button" type="button" onClick={() => void enableAlarmNotifications()}>
+              Enable Notifications
+            </button>
+          ) : null}
+        </div>
+      ) : null}
 
       {upcomingAlarm ? (
         <div className="server-time-alert" role="status" aria-live="polite">
@@ -487,7 +542,6 @@ export default function ServerTimePage({navigation}: ServerTimePageProps) {
         settings={plannerState.settings}
         events={plannerState.events}
         selectedTimezones={plannerState.settings.extraTimezones}
-        alternatingWeekState={alternatingWeekState}
         onSelectSlot={createEventFromSlot}
         onRemoveEvent={removeEvent}
       />
@@ -514,7 +568,7 @@ export default function ServerTimePage({navigation}: ServerTimePageProps) {
 
         {eventsPanelOpen ? (
           <div className="event-list event-list--summary">
-            {eventRows.map(({event, nextOccurrence, countdown, alarmKey}) => (
+            {eventRows.map(({event, nextOccurrence, primaryTime, primaryLabel, countdown, alarmKey}) => (
               <div className="event-card" key={event.id}>
                 <div className="event-card-header">
                   <div>
@@ -527,20 +581,20 @@ export default function ServerTimePage({navigation}: ServerTimePageProps) {
                 </div>
                 <div className="event-card-body">
                   <div className="event-card-stat">
-                    <span>Next Local</span>
-                    <strong>{nextOccurrence ? formatLocalDateTime(nextOccurrence) : "No upcoming occurrence"}</strong>
+                    <span>{primaryLabel}</span>
+                    <strong>{primaryTime ? formatLocalDateTime(primaryTime) : "No upcoming occurrence"}</strong>
                   </div>
                   <div className="event-card-stat">
                     <span>Countdown</span>
                     <strong>{countdown}</strong>
                   </div>
                   <div className="event-card-stat">
-                    <span>Alarm</span>
-                    <strong>{event.alarmEnabled ? `${event.alarmLeadMinutes}m` : "Off"}</strong>
+                    <span>Event Starts</span>
+                    <strong>{nextOccurrence ? formatLocalDateTime(nextOccurrence) : "No upcoming occurrence"}</strong>
                   </div>
                   <div className="event-card-stat">
-                    <span>Note</span>
-                    <strong>{event.note || "None"}</strong>
+                    <span>Alarm</span>
+                    <strong>{event.alarmEnabled ? `${event.alarmLeadMinutes}m lead` : "Off"}</strong>
                   </div>
                 </div>
                 <div className="event-card-actions">
@@ -573,7 +627,7 @@ export default function ServerTimePage({navigation}: ServerTimePageProps) {
       </section>
 
       <EventPlannerDialog
-        open={dialogSlot !== null || editingEvent !== null}
+        open={creatingEvent || dialogSlot !== null || editingEvent !== null}
         slot={dialogSlot}
         event={editingEvent}
         plannerState={plannerState}
@@ -582,6 +636,39 @@ export default function ServerTimePage({navigation}: ServerTimePageProps) {
       />
     </section>
   );
+}
+
+function playAlarmChime() {
+  if (typeof window === "undefined") return;
+
+  const AudioContextCtor =
+    window.AudioContext ||
+    (window as Window & typeof globalThis & {webkitAudioContext?: typeof AudioContext}).webkitAudioContext;
+
+  if (!AudioContextCtor) return;
+
+  try {
+    const audioContext = new AudioContextCtor();
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+
+    oscillator.type = "triangle";
+    oscillator.frequency.setValueAtTime(880, audioContext.currentTime);
+    gainNode.gain.setValueAtTime(0.0001, audioContext.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.08, audioContext.currentTime + 0.02);
+    gainNode.gain.exponentialRampToValueAtTime(0.0001, audioContext.currentTime + 0.45);
+
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+
+    oscillator.start();
+    oscillator.stop(audioContext.currentTime + 0.45);
+    oscillator.onended = () => {
+      void audioContext.close();
+    };
+  } catch {
+    // Ignore audio API issues.
+  }
 }
 
 function ensureAlternatingDefaults(

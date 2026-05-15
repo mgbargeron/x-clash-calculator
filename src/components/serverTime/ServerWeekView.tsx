@@ -4,7 +4,6 @@ import {
   buildServerWeekHours,
   formatLocalDateTime,
   formatServerDay,
-  type AlternatingWeekState,
   type PlannerEvent,
   type ServerTimeSettings,
   type ServerWeekHour,
@@ -16,7 +15,6 @@ type ServerWeekViewProps = {
   settings: ServerTimeSettings;
   events: PlannerEvent[];
   selectedTimezones: string[];
-  alternatingWeekState: AlternatingWeekState | null;
   onSelectSlot: (slot: ServerWeekHour) => void;
   onRemoveEvent: (eventId: string) => void;
 };
@@ -27,7 +25,6 @@ export default function ServerWeekView({
   settings,
   events,
   selectedTimezones,
-  alternatingWeekState,
   onSelectSlot,
   onRemoveEvent,
 }: ServerWeekViewProps) {
@@ -36,8 +33,7 @@ export default function ServerWeekView({
     now,
     settings,
     events,
-    selectedTimezones,
-    alternatingWeekState
+    selectedTimezones
   );
   const [showAllByDay, setShowAllByDay] = useState<Record<number, boolean>>(() =>
     Object.fromEntries(Array.from({length: 7}, (_, index) => [index, false]))

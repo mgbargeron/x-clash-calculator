@@ -67,7 +67,7 @@ export const DEFAULT_SERVER_TIME_STATE: ServerTimePlannerState = {
     resetTime: "19:00",
     extraTimezones: ["America/New_York", "Europe/London", "Asia/Singapore"],
     timezoneSelectorCollapsed: false,
-    alarmsMuted: false,
+    alarmsMuted: true,
     defaultAlarmLeadMinutes: 15,
   },
   events: [
@@ -203,19 +203,20 @@ export function getServerContext(now: Date, settings: ServerTimeSettings) {
     : new Date(resetToday.getTime() - DAY_MS);
   const nextReset = new Date(lastReset.getTime() + DAY_MS);
   const elapsedMinutes = Math.floor((now.getTime() - lastReset.getTime()) / 60_000);
+  const serverDate = new Date(lastReset.getTime() + DAY_MS);
 
   return {
     resetMinutes,
     lastReset,
     nextReset,
     serverMinutes: ((elapsedMinutes % MINUTES_PER_DAY) + MINUTES_PER_DAY) % MINUTES_PER_DAY,
-    serverDayOfWeek: lastReset.getDay(),
-    serverDate: lastReset,
+    serverDayOfWeek: serverDate.getDay(),
+    serverDate,
   };
 }
 
 export function getCurrentServerDateString(now: Date, settings: ServerTimeSettings): string {
-  return toDateInputString(getServerContext(now, settings).lastReset);
+  return toDateInputString(getServerContext(now, settings).serverDate);
 }
 
 export function formatServerClock(serverMinutes: number): string {
@@ -283,7 +284,6 @@ export function getNextEventOccurrence(
 ): Date | null {
   const context = getServerContext(now, plannerState.settings);
   const eventMinutes = parseTimeToMinutes(event.serverTime);
-  const alternatingState = getResolvedAlternatingWeekState(plannerState, now);
 
   for (let dayOffset = 0; dayOffset < 28; dayOffset += 1) {
     const dayStart = new Date(context.lastReset.getTime() + dayOffset * DAY_MS);
@@ -291,9 +291,9 @@ export function getNextEventOccurrence(
     if (occurrence.getTime() <= now.getTime()) continue;
 
     const serverDayOfWeek = (context.serverDayOfWeek + dayOffset) % 7;
-    const serverDate = toDateInputString(dayStart);
+    const serverDate = toDateInputString(new Date(dayStart.getTime() + DAY_MS));
 
-    if (eventMatchesSlot(event, serverDayOfWeek, eventMinutes, serverDate, alternatingState)) {
+    if (eventMatchesSlot(event, serverDayOfWeek, eventMinutes, serverDate)) {
       return occurrence;
     }
   }
@@ -375,8 +375,7 @@ export function buildServerWeekHours(
   now: Date,
   settings: ServerTimeSettings,
   events: PlannerEvent[],
-  selectedTimezones: string[],
-  alternatingState: AlternatingWeekState | null
+  selectedTimezones: string[]
 ): ServerWeekHour[][] {
   const currentContext = getServerContext(now, settings);
 
@@ -384,7 +383,7 @@ export function buildServerWeekHours(
     Array.from({length: 24}, (_, hour) => {
       const dayStart = new Date(weekStart.getTime() + dayIndex * DAY_MS);
       const localDate = new Date(dayStart.getTime() + hour * 60 * 60_000);
-      const serverDate = toDateInputString(dayStart);
+      const serverDate = toDateInputString(new Date(dayStart.getTime() + DAY_MS));
       const serverWeekStartDate = toDateInputString(weekStart);
       const serverLabel = `${String(hour).padStart(2, "0")}:00`;
       const timezoneLabels = selectedTimezones.reduce<Record<string, string>>((acc, timezone) => {
@@ -397,8 +396,7 @@ export function buildServerWeekHours(
           event,
           dayIndex,
           hour * 60,
-          serverDate,
-          alternatingState
+          serverDate
         )
       );
 
@@ -550,8 +548,7 @@ function eventMatchesSlot(
   event: PlannerEvent,
   serverDayOfWeek: number,
   slotMinutes: number,
-  serverDate: string,
-  alternatingState: AlternatingWeekState | null
+  serverDate: string
 ): boolean {
   const eventMinutes = parseTimeToMinutes(event.serverTime);
   if (eventMinutes < slotMinutes || eventMinutes >= slotMinutes + 60) return false;
@@ -564,12 +561,13 @@ function eventMatchesSlot(
     case "weekly":
       return event.serverDayOfWeek === serverDayOfWeek;
     case "alternating": {
-      const activeWeek = resolveAlternatingWeek(
-        event.alternatingAnchorDate || alternatingState?.anchorServerDate || serverDate,
-        event.alternatingWeek,
-        serverDate
-      );
-      return activeWeek === event.alternatingWeek;
+      const anchorDate = parseDateInput(event.alternatingAnchorDate || serverDate);
+      const currentDate = parseDateInput(serverDate);
+
+      if (!anchorDate || !currentDate) return false;
+
+      const daysBetween = Math.floor((currentDate.getTime() - anchorDate.getTime()) / DAY_MS);
+      return Math.abs(daysBetween) % 2 === 0;
     }
     default:
       return false;
