@@ -185,9 +185,9 @@ async function saveStoredMap(tiles: MapTilesById, rivalTeams: RivalTeam[], ourTe
   localStorage.setItem(MAP_STORAGE_KEY, data);
 
   if (typeof window !== "undefined" && "electronAPI" in window) {
-    const api = (window as any).electronAPI;
-    if (api?.saveGameMap) {
-      try { await api.saveGameMap(data); } catch {}
+    const api = window.electronAPI;
+    if (api?.setMapData) {
+      try { await api.setMapData(data); } catch {}
     }
   }
 }

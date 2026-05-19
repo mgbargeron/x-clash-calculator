@@ -1,5 +1,5 @@
 import {useEffect, useState} from "react";
-import {sanitizeNumericInput} from "./utils/sanatizeNumericInput";
+import {sanitizeNumericInput} from "./utils/sanitizeNumericInput";
 import CalculatorPage from "./pages/CalculatorPage";
 import HeroExpPage from "./pages/HeroExpPage";
 import GameMapPage from "./pages/GameMapPage";

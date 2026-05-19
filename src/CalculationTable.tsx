@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import Decimal from "decimal.js";
 import type { Row } from "./types";
-import { sanitizeNumericInput } from "./utils/sanatizeNumericInput";
+import { sanitizeNumericInput } from "./utils/sanitizeNumericInput";
 import { toDecimal } from "./utils/toDecimal";
 import { formatInputValue } from "./utils/formatInputValue";
 import { formatWholeDecimal } from "./utils/formatWholeDecimal";
@@ -92,7 +92,7 @@ const CalculationTable = ({
         <div className="table-header">Total</div>
 
         {rows.map((row, index) => (
-          <div className="table-row" key={index}>
+          <div className="table-row" key={row.description}>
             <div className="cell-display">{row.description}</div>
 
             {row.isStatic ? (

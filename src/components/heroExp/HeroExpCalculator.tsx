@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import Decimal from "decimal.js";
 import type { Row } from "../../types";
-import { sanitizeNumericInput } from "../../utils/sanatizeNumericInput";
+import { sanitizeNumericInput } from "../../utils/sanitizeNumericInput";
 import { toDecimal } from "../../utils/toDecimal";
 import { useLocalStorage } from "../../hooks/useLocalStorage";
 import { useInitialRowsSync } from "../../hooks/useInitialRowsSync";
@@ -212,11 +212,7 @@ export default function HeroExpCalculator({
 }: HeroExpCalculatorProps) {
   const levelListRef = useRef<HTMLDivElement | null>(null);
   const currentLevelRef = useRef<HTMLDivElement | null>(null);
-  const isMounted = useRef(false);
-
-  useEffect(() => {
-    isMounted.current = true;
-  }, []);
+  const isMounted = useRef(true);
 
   const initialRows = useMemo<Row[]>(
     () => [

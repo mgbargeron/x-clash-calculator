@@ -372,24 +372,17 @@ export default function ServerTimePage({navigation}: ServerTimePageProps) {
           <strong>{alternatingWeekState?.currentWeek ?? "Not Set"}</strong>
           <small>{alternatingWeekState ? `Anchor ${alternatingWeekState.anchorWeek} · ${alternatingWeekState.anchorServerDate}` : "Created from the first every-other-day event"}</small>
         </div>
-        <button
-          className={`mute-alarms-button ${plannerState.settings.alarmsMuted ? "active" : ""}`}
-          type="button"
-          onClick={() => {
-            const nextMuted = !plannerState.settings.alarmsMuted;
-
-            updateSettings((current) => ({
-              ...current,
-              alarmsMuted: nextMuted,
-            }));
-
-            if (!nextMuted) {
-              void enableAlarmNotifications();
-            }
-          }}
-        >
-          {plannerState.settings.alarmsMuted ? "Alarms Muted" : "Mute All Alarms"}
-        </button>
+        <div className="mute-alarms-placeholder">
+          <button
+            className={`mute-alarms-button ${plannerState.settings.alarmsMuted ? "active" : ""}`}
+            type="button"
+            disabled
+            title="Alarm controls are temporarily disabled."
+          >
+            {plannerState.settings.alarmsMuted ? "Alarms Muted" : "Mute All Alarms"}
+          </button>
+          <small>Will be added later</small>
+        </div>
       </div>
 
       {!plannerState.settings.alarmsMuted && notificationPermission !== "granted" ? (

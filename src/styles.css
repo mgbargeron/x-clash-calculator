@@ -182,9 +182,27 @@ body {
     padding: 18px 20px;
 }
 
+.mute-alarms-button:disabled {
+    border-color: rgba(150, 156, 175, 0.35);
+    background: rgba(96, 102, 120, 0.22);
+    color: rgba(242, 245, 255, 0.72);
+    cursor: not-allowed;
+}
+
 .mute-alarms-button.active {
     background: rgba(120, 126, 150, 0.24);
     border-color: rgba(157, 177, 255, 0.4);
+}
+
+.mute-alarms-placeholder {
+    display: grid;
+    gap: 8px;
+    min-height: 100%;
+}
+
+.mute-alarms-placeholder small {
+    color: rgba(217, 222, 247, 0.7);
+    text-align: center;
 }
 
 .server-time-alert {

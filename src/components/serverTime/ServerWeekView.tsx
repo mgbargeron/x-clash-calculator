@@ -38,12 +38,15 @@ export default function ServerWeekView({
   const [showAllByDay, setShowAllByDay] = useState<Record<number, boolean>>(() =>
     Object.fromEntries(Array.from({length: 7}, (_, index) => [index, false]))
   );
+  const [expandedEventSlots, setExpandedEventSlots] = useState<Record<string, boolean>>({});
   const dayHeaders = weekHours.map((dayHours, dayIndex) => ({
     dayIndex,
     label: formatServerDay(dayIndex),
     localDateLabel: formatLocalDateTime(dayHours[0]?.localDate ?? weekStart),
     visibleSlots: (showAllByDay[dayIndex] ? dayHours : dayHours.filter((slot) => slot.matchingEvents.length > 0)).length,
   }));
+  const eventSlotKeys = weekHours.flat().filter((slot) => slot.matchingEvents.length > 0).map((slot) => slot.key);
+  const allEventsExpanded = eventSlotKeys.length > 0 && eventSlotKeys.every((key) => expandedEventSlots[key]);
 
   return (
     <section className="server-time-panel">
@@ -51,6 +54,20 @@ export default function ServerWeekView({
         <div>
           <h2>Server Week</h2>
           <small>Sunday through Saturday, with every server hour mapped to local time.</small>
+        </div>
+        <div className="server-time-panel-actions">
+          <button
+            className="secondary-button"
+            type="button"
+            onClick={() =>
+              setExpandedEventSlots(
+                Object.fromEntries(eventSlotKeys.map((key) => [key, !allEventsExpanded]))
+              )
+            }
+            disabled={eventSlotKeys.length === 0}
+          >
+            {allEventsExpanded ? "Collapse All Events" : "Expand All Events"}
+          </button>
         </div>
       </div>
 
@@ -89,9 +106,16 @@ export default function ServerWeekView({
                   <DayCell
                     key={slot.key}
                     slot={slot}
+                    isExpanded={Boolean(expandedEventSlots[slot.key])}
                     selectedTimezones={selectedTimezones}
                     onSelectSlot={onSelectSlot}
                     onRemoveEvent={onRemoveEvent}
+                    onToggleExpanded={(nextOpen) =>
+                      setExpandedEventSlots((current) => ({
+                        ...current,
+                        [slot.key]: nextOpen,
+                      }))
+                    }
                   />
                 ))}
               </div>
@@ -105,12 +129,14 @@ export default function ServerWeekView({
 
 type DayCellProps = {
   slot: ServerWeekHour;
+  isExpanded: boolean;
   selectedTimezones: string[];
   onSelectSlot: (slot: ServerWeekHour) => void;
   onRemoveEvent: (eventId: string) => void;
+  onToggleExpanded: (nextOpen: boolean) => void;
 };
 
-function DayCell({slot, selectedTimezones, onSelectSlot, onRemoveEvent}: DayCellProps) {
+function DayCell({slot, isExpanded, selectedTimezones, onSelectSlot, onRemoveEvent, onToggleExpanded}: DayCellProps) {
   const hasEvent = slot.matchingEvents.length > 0;
 
   return (
@@ -122,9 +148,11 @@ function DayCell({slot, selectedTimezones, onSelectSlot, onRemoveEvent}: DayCell
         className="server-week-slot-button"
         type="button"
         onClick={() => onSelectSlot(slot)}
+        disabled
+        title="Event planning is temporarily disabled."
       >
         <div className="server-week-cell-top">
-          <strong>{slot.serverLabel}</strong>
+          <strong>Server Time {slot.serverLabel}</strong>
           <span>{slot.localLabel}</span>
         </div>
         {selectedTimezones.length > 0 ? (
@@ -139,7 +167,11 @@ function DayCell({slot, selectedTimezones, onSelectSlot, onRemoveEvent}: DayCell
         ) : null}
       </button>
       {slot.matchingEvents.length > 0 ? (
-        <details className="server-week-events-dropdown">
+        <details
+          className="server-week-events-dropdown"
+          open={isExpanded}
+          onToggle={(event) => onToggleExpanded(event.currentTarget.open)}
+        >
           <summary>
             <span>Show {slot.matchingEvents.length} event{slot.matchingEvents.length === 1 ? "" : "s"}</span>
             <span className="server-week-events-toggle-icon" aria-hidden="true">▾</span>

@@ -26,5 +26,5 @@ export function useScrollToElement({ listRef, targetRef, triggerId }: UseScrollT
     });
 
     lastTriggeredId.current = triggerId;
-  }, [listRef, targetRef, triggerId]);
+  }, [triggerId]);
 }

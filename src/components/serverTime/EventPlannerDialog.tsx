@@ -1,4 +1,4 @@
-import {useEffect, useState} from "react";
+import {useEffect, useRef, useState} from "react";
 
 import {
   createPlannerEvent,
@@ -29,12 +29,17 @@ export default function EventPlannerDialog({
   onSave,
 }: EventPlannerDialogProps) {
   const [draft, setDraft] = useState<PlannerEvent | null>(null);
+  const prevOpenRef = useRef(open);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || prevOpenRef.current) return;
+    prevOpenRef.current = open;
 
     if (event) {
-      setDraft(event);
+      setDraft({
+        ...event,
+        alarmEnabled: false,
+      });
       return;
     }
 
@@ -47,7 +52,7 @@ export default function EventPlannerDialog({
           oneTimeServerDate: slot.serverDate,
           alternatingWeek: plannerState.alternatingWeekState?.currentWeek ?? "A",
           alternatingAnchorDate: slot.serverDate,
-          alarmEnabled: true,
+          alarmEnabled: false,
         })
       );
       return;
@@ -90,6 +95,7 @@ export default function EventPlannerDialog({
     onSave({
       ...currentDraft,
       name: currentDraft.name.trim(),
+      alarmEnabled: false,
       oneTimeServerDate: sanitizeDateInput(currentDraft.oneTimeServerDate),
       serverTime: sanitizeTimeInput(currentDraft.serverTime),
     });
@@ -209,22 +215,6 @@ export default function EventPlannerDialog({
               </label>
             ) : null}
 
-            <label className="server-time-field">
-              <span>Alarm Lead (minutes)</span>
-              <input
-                className="cell-input"
-                type="number"
-                min="0"
-                max="1440"
-                value={currentDraft.alarmLeadMinutes}
-                onChange={(inputEvent) =>
-                  updateDraft((current) => ({
-                    ...current,
-                    alarmLeadMinutes: Number(inputEvent.target.value) > 0 ? Number(inputEvent.target.value) : 0,
-                  }))
-                }
-              />
-            </label>
           </div>
 
           <label className="server-time-field">
@@ -255,19 +245,6 @@ export default function EventPlannerDialog({
                 }
               />
               <span>Enabled</span>
-            </label>
-            <label className="server-time-toggle">
-              <input
-                type="checkbox"
-                checked={currentDraft.alarmEnabled}
-                onChange={(inputEvent) =>
-                  updateDraft((current) => ({
-                    ...current,
-                    alarmEnabled: inputEvent.target.checked,
-                  }))
-                }
-              />
-              <span>Alarm Enabled</span>
             </label>
           </div>
         </div>

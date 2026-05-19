@@ -1,4 +1,4 @@
-import {type ReactNode} from "react";
+import {type ReactNode, useMemo} from "react";
 import CalculationTable from "../CalculationTable";
 import type {Row} from "../types";
 import {formatInputValue} from "../utils/formatInputValue";
@@ -46,9 +46,9 @@ type CalculatorPageProps = {
 };
 
 export default function CalculatorPage({gridValues, updateGridCell, navigation}: CalculatorPageProps) {
-  const initialWheatRows: Row[] = getInitialResourceRows(gridValues[0]);
-  const initialIronRows: Row[] = getInitialResourceRows(gridValues[0]);
-  const initialGoldRows: Row[] = getInitialGoldRows(gridValues[1]);
+  const initialWheatRows = useMemo(() => getInitialResourceRows(gridValues[0]), [gridValues[0]]);
+  const initialIronRows = useMemo(() => getInitialResourceRows(gridValues[0]), [gridValues[0]]);
+  const initialGoldRows = useMemo(() => getInitialGoldRows(gridValues[1]), [gridValues[1]]);
 
   return (
     <section className="card calculator">
