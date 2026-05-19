@@ -1,4 +1,4 @@
-import {Row} from "../App";
+import type {Row} from "../types";
 
 export function loadRows(initialRows: Row[], storageKey: string): Row[] {
   const savedRows = window.localStorage.getItem(storageKey)

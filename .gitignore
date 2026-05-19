@@ -10,3 +10,14 @@ yarn-error.log*
 
 .vscode/*
 /releases/
+/dist/
+/.idea/.gitignore
+/.idea/aws.xml
+/.idea/awsToolkit.xml
+/.idea/modules.xml
+/.idea/vcs.xml
+/.idea/workspace.xml
+/.idea/x-clash-calculator.iml
+/.idea/
+/opencode.json
+/AGENTS.md

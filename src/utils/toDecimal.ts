@@ -1,4 +1,4 @@
-import {sanitizeNumericInput} from "./sanatizeNumericInput";
+import {sanitizeNumericInput} from "./sanitizeNumericInput";
 import Decimal from "decimal.js";
 
 export function toDecimal(input: string) {
