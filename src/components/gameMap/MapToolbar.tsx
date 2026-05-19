@@ -1,4 +1,4 @@
-import type { CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import type { TileMarker } from "./types";
 
 type RivalButtonStyle = CSSProperties & {
@@ -12,6 +12,9 @@ type EnemyButtonStyle = CSSProperties & {
 type TeamItem = { code: string; name: string };
 
 type MapToolbarProps = {
+  serverIds: string[];
+  activeServerId: string;
+  canRemoveActiveServer: boolean;
   clearMarkerCount: number;
   selectedMarker: TileMarker;
   ourTeam: TeamItem & { color: string };
@@ -19,6 +22,10 @@ type MapToolbarProps = {
   enemyTeams: Array<{ id: string; name: string; code: string }>;
   selectedRivalTeamId: string;
   selectedEnemyTeamId: string;
+  onServerSelect: (id: string) => void;
+  onServerAdd: (id: string) => boolean;
+  onActiveServerRename: (id: string) => boolean;
+  onActiveServerRemove: () => void;
   onMarkerChange: (marker: TileMarker) => void;
   onRivalSelect: (id: string) => void;
   onEnemySelect: (id: string) => void;
@@ -36,6 +43,9 @@ function formatTeamDisplayLabel(code: string, name: string): string {
 }
 
 export function MapToolbar({
+  serverIds,
+  activeServerId,
+  canRemoveActiveServer,
   clearMarkerCount,
   selectedMarker,
   ourTeam,
@@ -43,13 +53,199 @@ export function MapToolbar({
   enemyTeams,
   selectedRivalTeamId,
   selectedEnemyTeamId,
+  onServerSelect,
+  onServerAdd,
+  onActiveServerRename,
+  onActiveServerRemove,
   onMarkerChange,
   onRivalSelect,
   onEnemySelect,
 }: MapToolbarProps) {
+  const [isAddingServer, setIsAddingServer] = useState(false);
+  const [isEditingServerId, setIsEditingServerId] = useState(false);
+  const [serverDraft, setServerDraft] = useState("");
+  const [serverDraftInvalid, setServerDraftInvalid] = useState(false);
+  const [serverEditDraft, setServerEditDraft] = useState(activeServerId);
+  const [serverEditInvalid, setServerEditInvalid] = useState(false);
+
+  useEffect(() => {
+    setServerEditDraft(activeServerId);
+    setServerEditInvalid(false);
+    setIsEditingServerId(false);
+  }, [activeServerId]);
+
+  function submitServer() {
+    const nextServerId = serverDraft.trim();
+    const didAddServer = onServerAdd(nextServerId);
+
+    if (didAddServer) {
+      setIsAddingServer(false);
+      setServerDraft("");
+      setServerDraftInvalid(false);
+      return;
+    }
+
+    setServerDraftInvalid(true);
+  }
+
+  function submitServerRename() {
+    const nextServerId = serverEditDraft.trim();
+    const didRenameServer = onActiveServerRename(nextServerId);
+
+    if (didRenameServer) {
+      setServerEditInvalid(false);
+      setIsEditingServerId(false);
+      return;
+    }
+
+    setServerEditInvalid(true);
+  }
+
   return (
     <div className="map-toolbar" aria-label="Map tile tools">
-      <div className="tile-tools">
+      <div className="map-toolbar-section server-tools" aria-label="Server map selector">
+        <div className="server-strip">
+          {serverIds.map((serverId) => (
+            <button
+              key={serverId}
+              className={`icon-tool-button server-tool-button ${
+                activeServerId === serverId ? "active" : ""
+              }`}
+              type="button"
+              title={`Switch to server ${serverId}`}
+              aria-label={`Switch to server ${serverId}`}
+            onClick={() => onServerSelect(serverId)}
+          >
+            <span className="team-code">{serverId}</span>
+          </button>
+          ))}
+          {isEditingServerId ? (
+            <input
+              className={`server-id-input server-id-input--edit ${serverEditInvalid ? "invalid" : ""}`}
+              type="text"
+              value={serverEditDraft}
+              maxLength={3}
+              inputMode="numeric"
+              pattern="[0-9]{3}"
+              placeholder={activeServerId}
+              aria-label={`Edit active server number ${activeServerId}`}
+              aria-invalid={serverEditInvalid}
+              onChange={(event) => {
+                setServerEditDraft(event.target.value.replace(/\D/g, "").slice(0, 3));
+                setServerEditInvalid(false);
+              }}
+              onBlur={() => {
+                if (serverEditDraft === activeServerId) {
+                  setIsEditingServerId(false);
+                  return;
+                }
+                submitServerRename();
+              }}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  submitServerRename();
+                }
+
+                if (event.key === "Escape") {
+                  setServerEditDraft(activeServerId);
+                  setServerEditInvalid(false);
+                  setIsEditingServerId(false);
+                }
+              }}
+              autoFocus
+            />
+          ) : null}
+          {isAddingServer ? (
+            <input
+              className={`server-id-input ${serverDraftInvalid ? "invalid" : ""}`}
+              type="text"
+              value={serverDraft}
+              maxLength={3}
+              inputMode="numeric"
+              pattern="[0-9]{3}"
+              placeholder="001"
+              aria-label="Add server"
+              aria-invalid={serverDraftInvalid}
+              onChange={(event) => {
+                setServerDraft(event.target.value.replace(/\D/g, "").slice(0, 3));
+                setServerDraftInvalid(false);
+              }}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  submitServer();
+                }
+
+                if (event.key === "Escape") {
+                  setIsAddingServer(false);
+                  setServerDraft("");
+                  setServerDraftInvalid(false);
+                }
+              }}
+              autoFocus
+            />
+          ) : (
+            <button
+              className="aside-add-button asidetip"
+              type="button"
+              data-tip="Add server"
+              aria-label="Add server"
+              onClick={() => setIsAddingServer(true)}
+            >
+              +
+            </button>
+          )}
+          {isAddingServer ? (
+            <button
+              className="map-toolbar-mini-button asidetip"
+              type="button"
+              data-tip="Confirm server"
+              aria-label="Confirm server"
+              onClick={submitServer}
+            >
+              +
+            </button>
+          ) : null}
+          {isEditingServerId ? (
+            <button
+              className="map-toolbar-mini-button asidetip"
+              type="button"
+              data-tip="Save server number"
+              aria-label={`Save server number ${serverEditDraft}`}
+              onClick={submitServerRename}
+            >
+              #
+            </button>
+          ) : (
+            <button
+              className="map-toolbar-mini-button asidetip"
+              type="button"
+              data-tip="Edit active server number"
+              aria-label={`Edit server number ${activeServerId}`}
+              onClick={() => {
+                setServerEditDraft(activeServerId);
+                setServerEditInvalid(false);
+                setIsEditingServerId(true);
+              }}
+            >
+              #
+            </button>
+          )}
+          <button
+            className="remove-team-button asidetip"
+            type="button"
+            data-tip="Remove active server"
+            aria-label={`Remove server ${activeServerId}`}
+            disabled={!canRemoveActiveServer}
+            onClick={onActiveServerRemove}
+          >
+            ×
+          </button>
+        </div>
+      </div>
+
+      <div className="map-toolbar-section tile-tools">
         {markerTools.map((tool) => (
           <button
             className={`icon-tool-button clear-tool-button ${tool.marker} ${

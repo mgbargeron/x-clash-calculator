@@ -126,7 +126,7 @@ export function ScorePanel({
 
       {/* Our Team - can edit name, code, and color */}
       <div className="score-group-label">
-        <span>Our Team</span>
+        <span>Our Base</span>
       </div>
 
       <TeamRow
@@ -144,7 +144,7 @@ export function ScorePanel({
 
       {/* Rival teams - can edit name, code, and color */}
       <div className="score-group-label">
-        <span>Rival Teams</span>
+        <span>Rivals</span>
         <button
           className="aside-add-button asidetip"
           type="button"
@@ -175,7 +175,7 @@ export function ScorePanel({
 
       {/* Enemy teams - can only edit name and code (no color picker) */}
       <div className="score-group-label">
-        <span>Enemy Teams</span>
+        <span>Enemies</span>
         <button
           className="aside-add-button asidetip"
           type="button"

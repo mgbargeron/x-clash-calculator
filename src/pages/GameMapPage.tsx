@@ -1,42 +1,55 @@
-import { useEffect, useEffectEvent, useRef, useState } from "react";
-import type { CSSProperties, ReactNode } from "react";
+import { useEffect, useEffectEvent, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 
-import type { TileMarker, MapTile, OurTeamConfig, RivalTeam, EnemyTeam } from "../components/gameMap/types";
+import {
+  MapBoard,
+  MapToolbar,
+  ScorePanel,
+} from "../components/gameMap";
+import type {
+  EnemyTeam,
+  GameMapSnapshot,
+  MapTile,
+  MapTilesById,
+  MultiServerMapStore,
+  OurTeamConfig,
+  RivalTeam,
+  ServerId,
+  TileMarker,
+} from "../components/gameMap/types";
+import { usePointSummaries } from "../hooks/usePointSummaries";
 import { defaultGameMapConfig } from "../utils/gameMapConfig";
 import type { GameMapConfig } from "../utils/gameMapConfig";
-import { usePointSummaries } from "../hooks/usePointSummaries";
-import {MapBoard, MapToolbar, ScorePanel} from "../components/gameMap";
 
-type MapTilesById = Record<string, MapTile>;
-
-type GameMapSnapshot = {
-  tiles: MapTilesById;
-  rivalTeams: RivalTeam[];
-  ourTeam: OurTeamConfig;
-  enemyTeams: EnemyTeam[];
-  selectedTileId: string;
-  selectedRivalTeamId: string;
-  selectedEnemyTeamId: string;
-};
-
-const MAP_STORAGE_KEY = "game-map-v1";
+const MAP_STORAGE_KEY = "game-map-v2";
+const LEGACY_MAP_STORAGE_KEY = "game-map-v1";
+const DEFAULT_SERVER_ID = "001";
 const MAX_ACTION_HISTORY = 10;
 const MIN_MAP_ZOOM = 0.75;
 const MAX_MAP_ZOOM = 2;
 const DEFAULT_MAP_ZOOM = 1.2;
 const MAP_ZOOM_STEP = 0.1;
+const DEFAULT_OUR_TEAM: OurTeamConfig = { color: "#45b66b", name: "Our Team", code: "OUR" };
+const DEFAULT_RIVAL_COLOR = "#9d8465";
 
 type StoredMapData = {
   tiles?: Record<string, unknown> | null;
   rivalTeams?: unknown[] | null;
   ourTeam?: unknown;
   enemyTeams?: unknown[] | null;
-  selectedTileId?: string;
+  selectedTileId?: unknown;
+  selectedRivalTeamId?: unknown;
+  selectedEnemyTeamId?: unknown;
 };
 
-type StoredOurTeam = { color: string; name: string; code: string };
-type StoredRivalTeam = { id?: string; color: string; name: string; code: string };
-type StoredEnemyTeam = { id?: string; name: string; code: string };
+type StoredMultiServerMapData = {
+  activeServerId?: unknown;
+  serverOrder?: unknown;
+  serversById?: unknown;
+};
+
+type StoredOurTeam = { color?: unknown; name?: unknown; code?: unknown };
+type StoredRivalTeam = { id?: unknown; color?: unknown; name?: unknown; code?: unknown };
+type StoredEnemyTeam = { id?: unknown; name?: unknown; code?: unknown };
 type StoredTile = {
   marker?: unknown;
   rivalColor?: unknown;
@@ -79,7 +92,7 @@ function generateTeamCode(name: string): string {
   }
 
   if (words.length === 2) {
-    return `${words[0][0] ?? "X"}${(words[1][0] ?? "X")}${(words[1][1] ?? words[0][1] ?? "X")}`.toUpperCase();
+    return `${words[0][0] ?? "X"}${words[1][0] ?? "X"}${words[1][1] ?? words[0][1] ?? "X"}`.toUpperCase();
   }
 
   const compact = trimmedName.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
@@ -94,6 +107,32 @@ function syncGeneratedCode(currentCode: string, previousName: string, nextName: 
   return currentCode;
 }
 
+function isValidServerId(value: string): value is ServerId {
+  return /^\d{3}$/.test(value);
+}
+
+function normalizeServerId(value: unknown): ServerId | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return isValidServerId(trimmed) ? trimmed : null;
+}
+
+function parseStoredPayload(raw: unknown): unknown {
+  let current = raw;
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    if (typeof current !== "string") break;
+
+    try {
+      current = JSON.parse(current);
+    } catch {
+      break;
+    }
+  }
+
+  return current;
+}
+
 function normalizeMap(
   mapConfig: GameMapConfig,
   rivalTeams: RivalTeam[],
@@ -101,95 +140,275 @@ function normalizeMap(
   storedTiles?: Record<string, unknown> | null
 ): MapTilesById {
   const rivalIdByColor = new Map(rivalTeams.map((team) => [team.color, team.id]));
+  const rivalIds = new Set(rivalTeams.map((team) => team.id));
   const enemyIds = new Set(enemyTeams.map((team) => team.id));
 
-  return mapConfig.tiles.reduce<MapTilesById>(
-    (tiles, tile) => {
-      const storedTile = storedTiles?.[tile.id] as StoredTile | undefined;
-      const normalizedMarker =
-        storedTile?.marker === "base" ||
-        storedTile?.marker === "enemy" ||
-        storedTile?.marker === "rival" ||
-        storedTile?.marker === "none"
-          ? storedTile.marker
-          : "none";
-      const rivalTeamId =
-        typeof storedTile?.rivalTeamId === "string"
-          ? storedTile.rivalTeamId
-          : typeof storedTile?.rivalColor === "string"
-            ? rivalIdByColor.get(storedTile.rivalColor)
-            : undefined;
-      const enemyTeamId =
-        typeof storedTile?.enemyTeamId === "string" && enemyIds.has(storedTile.enemyTeamId)
-          ? storedTile.enemyTeamId
-          : typeof storedTile?.enemyColor === "string" && enemyIds.has(storedTile.enemyColor)
-            ? storedTile.enemyColor
-            : undefined;
+  return mapConfig.tiles.reduce<MapTilesById>((tiles, tile) => {
+    const storedTile = storedTiles?.[tile.id] as StoredTile | undefined;
+    const normalizedMarker =
+      storedTile?.marker === "base" ||
+      storedTile?.marker === "enemy" ||
+      storedTile?.marker === "rival" ||
+      storedTile?.marker === "none"
+        ? storedTile.marker
+        : "none";
+    const rivalTeamId =
+      typeof storedTile?.rivalTeamId === "string" && rivalIds.has(storedTile.rivalTeamId)
+        ? storedTile.rivalTeamId
+        : typeof storedTile?.rivalColor === "string"
+          ? rivalIdByColor.get(storedTile.rivalColor)
+          : undefined;
+    const enemyTeamId =
+      typeof storedTile?.enemyTeamId === "string" && enemyIds.has(storedTile.enemyTeamId)
+        ? storedTile.enemyTeamId
+        : undefined;
 
-      tiles[tile.id] = {
-        marker: normalizedMarker,
-        rivalTeamId,
-        enemyTeamId,
-        note: typeof storedTile?.note === "string" ? storedTile.note : "",
-      };
+    tiles[tile.id] = {
+      marker: normalizedMarker,
+      rivalTeamId,
+      enemyTeamId,
+      note: typeof storedTile?.note === "string" ? storedTile.note : "",
+    };
 
-      return tiles;
-    },
-    {} as MapTilesById
-  );
+    return tiles;
+  }, {});
 }
 
 function normalizeRivalTeams(stored: unknown): RivalTeam[] {
   const arr = Array.isArray(stored) ? stored : [];
-  return (arr as StoredRivalTeam[]).map((t, index) => {
-    const name = t.name || "Unnamed";
-    return { id: t.id ?? createStableId(`rival-${index + 1}`), color: t.color, name, code: t.code || generateTeamCode(name) };
+
+  return (arr as StoredRivalTeam[]).map((team, index) => {
+    const name = typeof team.name === "string" && team.name.trim() ? team.name : "Rival";
+    return {
+      id: typeof team.id === "string" && team.id.trim() ? team.id : createStableId(`rival-${index + 1}`),
+      color: typeof team.color === "string" && team.color.trim() ? team.color : DEFAULT_RIVAL_COLOR,
+      name,
+      code: typeof team.code === "string" && team.code.trim() ? team.code : generateTeamCode(name),
+    };
   });
 }
 
 function normalizeOurTeam(stored: unknown): OurTeamConfig {
   const obj = (stored ?? {}) as StoredOurTeam;
-  return obj.color ? { color: obj.color, name: obj.name || "Our Team", code: obj.code } : { color: "#45b66b", name: "Our Team", code: "OUR" };
+  const name = typeof obj.name === "string" && obj.name.trim() ? obj.name : DEFAULT_OUR_TEAM.name;
+  const color = typeof obj.color === "string" && obj.color.trim() ? obj.color : DEFAULT_OUR_TEAM.color;
+  const code =
+    typeof obj.code === "string" && obj.code.trim() ? obj.code : generateTeamCode(name || DEFAULT_OUR_TEAM.name);
+
+  return { color, name, code };
 }
 
 function normalizeEnemyTeams(stored: unknown): EnemyTeam[] {
   const arr = Array.isArray(stored) ? stored : [];
-  return (arr as StoredEnemyTeam[]).map((t, idx) => ({
-    id: t.id ?? createStableId(`enemy-${idx + 1}`),
-    name: t.name || "Enemy",
-    code: t.code || generateTeamCode(t.name || "Enemy"),
-  }));
-}
 
-async function loadStoredMap(): Promise<{ tiles: Record<string, unknown> | null; rivalTeams: any[]; ourTeam: any; enemyTeams: any[]; selectedTileId: string | null }> {
-  const storedRaw = localStorage.getItem(MAP_STORAGE_KEY);
-  
-  if (!storedRaw) return { tiles: null, rivalTeams: [], ourTeam: null, enemyTeams: [], selectedTileId: null };
-
-  try {
-    const stored = JSON.parse(storedRaw) as StoredMapData;
+  return (arr as StoredEnemyTeam[]).map((team, index) => {
+    const name = typeof team.name === "string" && team.name.trim() ? team.name : "Enemy";
     return {
-      tiles: stored.tiles ?? null,
-      rivalTeams: (stored.rivalTeams as any[]) || [],
-      ourTeam: stored.ourTeam ?? null,
-      enemyTeams: (stored.enemyTeams as any[]) || [],
-      selectedTileId: stored.selectedTileId ?? null,
+      id: typeof team.id === "string" && team.id.trim() ? team.id : createStableId(`enemy-${index + 1}`),
+      name,
+      code: typeof team.code === "string" && team.code.trim() ? team.code : generateTeamCode(name),
     };
-  } catch {
-    return { tiles: null, rivalTeams: [], ourTeam: null, enemyTeams: [], selectedTileId: null };
-  }
+  });
 }
 
-async function saveStoredMap(tiles: MapTilesById, rivalTeams: RivalTeam[], ourTeam: OurTeamConfig, enemyTeams: EnemyTeam[], selectedTileId: string) {
-  const data = JSON.stringify({ tiles, rivalTeams, ourTeam, enemyTeams, selectedTileId });
-  localStorage.setItem(MAP_STORAGE_KEY, data);
+function createDefaultServerSnapshot(
+  mapConfig: GameMapConfig,
+  firstTileId: string
+): GameMapSnapshot {
+  return {
+    tiles: normalizeMap(mapConfig, [], []),
+    rivalTeams: [],
+    ourTeam: DEFAULT_OUR_TEAM,
+    enemyTeams: [],
+    selectedTileId: firstTileId,
+    selectedRivalTeamId: "",
+    selectedEnemyTeamId: "",
+  };
+}
 
-  if (typeof window !== "undefined" && "electronAPI" in window) {
-    const api = window.electronAPI;
-    if (api?.setMapData) {
-      try { await api.setMapData(data); } catch {}
+function createDefaultMapStore(
+  mapConfig: GameMapConfig,
+  firstTileId: string
+): MultiServerMapStore {
+  return {
+    activeServerId: DEFAULT_SERVER_ID,
+    serverOrder: [DEFAULT_SERVER_ID],
+    serversById: {
+      [DEFAULT_SERVER_ID]: createDefaultServerSnapshot(mapConfig, firstTileId),
+    },
+  };
+}
+
+function normalizeStoredSnapshot(
+  raw: unknown,
+  mapConfig: GameMapConfig,
+  firstTileId: string
+): GameMapSnapshot {
+  const stored = (raw ?? {}) as StoredMapData;
+  const rivalTeams = normalizeRivalTeams(stored.rivalTeams);
+  const enemyTeams = normalizeEnemyTeams(stored.enemyTeams);
+  const ourTeam = normalizeOurTeam(stored.ourTeam);
+  const tiles = normalizeMap(mapConfig, rivalTeams, enemyTeams, stored.tiles);
+  const selectedTileId =
+    typeof stored.selectedTileId === "string" && stored.selectedTileId in tiles
+      ? stored.selectedTileId
+      : firstTileId;
+  const selectedRivalTeamId =
+    typeof stored.selectedRivalTeamId === "string" &&
+    rivalTeams.some((team) => team.id === stored.selectedRivalTeamId)
+      ? stored.selectedRivalTeamId
+      : rivalTeams[0]?.id ?? "";
+  const selectedEnemyTeamId =
+    typeof stored.selectedEnemyTeamId === "string" &&
+    enemyTeams.some((team) => team.id === stored.selectedEnemyTeamId)
+      ? stored.selectedEnemyTeamId
+      : enemyTeams[0]?.id ?? "";
+
+  return {
+    tiles,
+    rivalTeams,
+    ourTeam,
+    enemyTeams,
+    selectedTileId,
+    selectedRivalTeamId,
+    selectedEnemyTeamId,
+  };
+}
+
+function normalizeStoredMapStore(
+  raw: unknown,
+  mapConfig: GameMapConfig,
+  firstTileId: string
+): MultiServerMapStore {
+  const parsed = parseStoredPayload(raw);
+
+  if (!parsed || typeof parsed !== "object") {
+    return createDefaultMapStore(mapConfig, firstTileId);
+  }
+
+  if ("serversById" in parsed || "serverOrder" in parsed || "activeServerId" in parsed) {
+    const stored = parsed as StoredMultiServerMapData;
+    const serversByIdRaw =
+      stored.serversById && typeof stored.serversById === "object" ? stored.serversById : {};
+    const requestedOrder = Array.isArray(stored.serverOrder) ? stored.serverOrder : [];
+    const normalizedOrder: ServerId[] = [];
+    const normalizedServersById: Record<ServerId, GameMapSnapshot> = {};
+
+    for (const candidate of requestedOrder) {
+      const serverId = normalizeServerId(candidate);
+      if (!serverId || normalizedOrder.includes(serverId)) continue;
+
+      const rawSnapshot =
+        serverId in (serversByIdRaw as Record<string, unknown>)
+          ? (serversByIdRaw as Record<string, unknown>)[serverId]
+          : undefined;
+
+      normalizedOrder.push(serverId);
+      normalizedServersById[serverId] = normalizeStoredSnapshot(rawSnapshot, mapConfig, firstTileId);
+    }
+
+    for (const [key, value] of Object.entries(serversByIdRaw as Record<string, unknown>)) {
+      const serverId = normalizeServerId(key);
+      if (!serverId || normalizedOrder.includes(serverId)) continue;
+
+      normalizedOrder.push(serverId);
+      normalizedServersById[serverId] = normalizeStoredSnapshot(value, mapConfig, firstTileId);
+    }
+
+    if (normalizedOrder.length === 0) {
+      return createDefaultMapStore(mapConfig, firstTileId);
+    }
+
+    const normalizedActiveServerId =
+      normalizeServerId(stored.activeServerId) && normalizedServersById[normalizeServerId(stored.activeServerId)!]
+        ? normalizeServerId(stored.activeServerId)!
+        : normalizedOrder[0];
+
+    return {
+      activeServerId: normalizedActiveServerId,
+      serverOrder: normalizedOrder,
+      serversById: normalizedServersById,
+    };
+  }
+
+  if ("tiles" in parsed || "rivalTeams" in parsed || "ourTeam" in parsed || "enemyTeams" in parsed) {
+    const legacySnapshot = normalizeStoredSnapshot(parsed, mapConfig, firstTileId);
+    return {
+      activeServerId: DEFAULT_SERVER_ID,
+      serverOrder: [DEFAULT_SERVER_ID],
+      serversById: {
+        [DEFAULT_SERVER_ID]: legacySnapshot,
+      },
+    };
+  }
+
+  return createDefaultMapStore(mapConfig, firstTileId);
+}
+
+async function loadStoredMapStore(
+  mapConfig: GameMapConfig,
+  firstTileId: string
+): Promise<MultiServerMapStore> {
+  let raw: unknown = null;
+
+  if (window.electronAPI.getMapData) {
+    try {
+      raw = await window.electronAPI.getMapData();
+    } catch {
+      raw = null;
     }
   }
+
+  if (!raw) {
+    try {
+      raw = JSON.parse(localStorage.getItem(MAP_STORAGE_KEY) ?? "null");
+    } catch {
+      raw = null;
+    }
+  }
+
+  if (raw) {
+    return normalizeStoredMapStore(raw, mapConfig, firstTileId);
+  }
+
+  let legacyRaw: unknown = null;
+
+  try {
+    legacyRaw = JSON.parse(localStorage.getItem(LEGACY_MAP_STORAGE_KEY) ?? "null");
+  } catch {
+    legacyRaw = null;
+  }
+
+  if (legacyRaw) {
+    return normalizeStoredMapStore(legacyRaw, mapConfig, firstTileId);
+  }
+
+  return createDefaultMapStore(mapConfig, firstTileId);
+}
+
+async function saveStoredMapStore(store: MultiServerMapStore) {
+  localStorage.setItem(MAP_STORAGE_KEY, JSON.stringify(store));
+
+  if (window.electronAPI.setMapData) {
+    try {
+      await window.electronAPI.setMapData(store);
+    } catch {
+      // Ignore persistence failures outside localStorage.
+    }
+  }
+}
+
+function replaceActiveServerSnapshot(
+  store: MultiServerMapStore,
+  snapshot: GameMapSnapshot
+): MultiServerMapStore {
+  return {
+    ...store,
+    serversById: {
+      ...store.serversById,
+      [store.activeServerId]: snapshot,
+    },
+  };
 }
 
 type GameMapPageProps = { navigation: ReactNode };
@@ -199,38 +418,42 @@ export default function GameMapPage({ navigation }: GameMapPageProps) {
   const firstTileId = mapConfig.tiles[0]?.id ?? "";
   const boardRef = useRef<HTMLDivElement | null>(null);
   const hasLoadedStoredMap = useRef(false);
+  const [mapStore, setMapStore] = useState<MultiServerMapStore>(() =>
+    createDefaultMapStore(mapConfig, firstTileId)
+  );
 
-  // Undo system refs
-  const latestSnapshotRef = useRef<GameMapSnapshot | null>(null);
+  const latestStoreRef = useRef(mapStore);
+  const latestSnapshotRef = useRef(mapStore.serversById[mapStore.activeServerId]);
   const undoStackRef = useRef<GameMapSnapshot[]>([]);
 
-  // State
-  const [tiles, setTiles] = useState<MapTilesById>(() => normalizeMap(mapConfig, [], []));
   const [selectedMarker, setSelectedMarker] = useState<TileMarker>("base");
-  const [selectedRivalTeamId, setSelectedRivalTeamId] = useState("");
-  const [selectedTileId, setSelectedTileId] = useState(firstTileId);
   const [teamManagementLocked, setTeamManagementLocked] = useState(true);
-  const [rivalTeams, setRivalTeams] = useState<RivalTeam[]>([]);
-  const [ourTeam, setOurTeam] = useState<OurTeamConfig>({ color: "#45b66b", name: "Our Team", code: "OUR" });
-  const [enemyTeams, setEnemyTeams] = useState<EnemyTeam[]>([]);
-  const [selectedEnemyTeamId, setSelectedEnemyTeamId] = useState("");
   const [mapZoom, setMapZoom] = useState(DEFAULT_MAP_ZOOM);
   const [panelCollapsed, setPanelCollapsed] = useState(false);
 
-  // Undo system
-  function getCurrentSnapshot(): GameMapSnapshot {
-    return latestSnapshotRef.current ?? { tiles, rivalTeams, ourTeam, enemyTeams, selectedTileId, selectedRivalTeamId, selectedEnemyTeamId };
+  const activeServerSnapshot = mapStore.serversById[mapStore.activeServerId];
+  const {
+    tiles,
+    rivalTeams,
+    ourTeam,
+    enemyTeams,
+    selectedTileId,
+    selectedRivalTeamId,
+    selectedEnemyTeamId,
+  } = activeServerSnapshot;
+
+  function applyMapStore(nextStore: MultiServerMapStore) {
+    latestStoreRef.current = nextStore;
+    latestSnapshotRef.current = nextStore.serversById[nextStore.activeServerId];
+    setMapStore(nextStore);
   }
 
-  function applySnapshot(snapshot: GameMapSnapshot) {
-    latestSnapshotRef.current = snapshot;
-    setTiles(snapshot.tiles);
-    setRivalTeams(snapshot.rivalTeams);
-    setOurTeam(snapshot.ourTeam);
-    setEnemyTeams(snapshot.enemyTeams);
-    setSelectedTileId(snapshot.selectedTileId);
-    setSelectedRivalTeamId(snapshot.selectedRivalTeamId);
-    setSelectedEnemyTeamId(snapshot.selectedEnemyTeamId);
+  function getCurrentSnapshot(): GameMapSnapshot {
+    return latestSnapshotRef.current;
+  }
+
+  function applyActiveSnapshot(snapshot: GameMapSnapshot) {
+    applyMapStore(replaceActiveServerSnapshot(latestStoreRef.current, snapshot));
   }
 
   function snapshotsEqual(a: GameMapSnapshot, b: GameMapSnapshot) {
@@ -245,13 +468,22 @@ export default function GameMapPage({ navigation }: GameMapPageProps) {
     );
   }
 
+  function patchActiveSnapshot(patch: Partial<GameMapSnapshot>) {
+    const current = getCurrentSnapshot();
+    applyActiveSnapshot({ ...current, ...patch });
+  }
+
   function commitAction(updater: (current: GameMapSnapshot) => GameMapSnapshot) {
     const current = getCurrentSnapshot();
     const next = updater(current);
     if (snapshotsEqual(current, next)) return;
 
-    applySnapshot(next);
+    applyActiveSnapshot(next);
     undoStackRef.current = [current, ...undoStackRef.current].slice(0, MAX_ACTION_HISTORY);
+  }
+
+  function clearUndoHistory() {
+    undoStackRef.current = [];
   }
 
   function undoLastAction() {
@@ -259,77 +491,67 @@ export default function GameMapPage({ navigation }: GameMapPageProps) {
     if (!snapshotToRestore) return;
 
     undoStackRef.current = undoStackRef.current.slice(1);
-    applySnapshot(snapshotToRestore);
+    applyActiveSnapshot(snapshotToRestore);
   }
 
-  // Storage loading (async)
   useEffect(() => {
-    let isMounted = true;
+    let cancelled = false;
 
-    void loadStoredMap().then((storedMap) => {
-      if (!isMounted) return;
-      const normalizedRivalTeams =
-        storedMap.rivalTeams && (storedMap.rivalTeams as any[]).length > 0 ? normalizeRivalTeams(storedMap.rivalTeams) : [];
-      const normalizedEnemyTeams =
-        storedMap.enemyTeams && (storedMap.enemyTeams as any[]).length > 0 ? normalizeEnemyTeams(storedMap.enemyTeams) : [];
+    void loadStoredMapStore(mapConfig, firstTileId).then((storedMapStore) => {
+      if (cancelled) return;
 
-      applySnapshot({
-        tiles: normalizeMap(mapConfig, normalizedRivalTeams, normalizedEnemyTeams, storedMap.tiles),
-        rivalTeams: normalizedRivalTeams,
-        ourTeam: storedMap.ourTeam ? normalizeOurTeam(storedMap.ourTeam) : { color: "#45b66b", name: "Our Team", code: "OUR" },
-        enemyTeams: normalizedEnemyTeams,
-        selectedTileId: storedMap.selectedTileId ?? firstTileId,
-        selectedRivalTeamId: normalizedRivalTeams[0]?.id ?? "",
-        selectedEnemyTeamId: normalizedEnemyTeams[0]?.id ?? "",
-      });
-      undoStackRef.current = [];
+      applyMapStore(storedMapStore);
+      clearUndoHistory();
       hasLoadedStoredMap.current = true;
     });
 
-    return () => { isMounted = false; };
-  }, [mapConfig]);
+    return () => {
+      cancelled = true;
+    };
+  }, [firstTileId, mapConfig]);
 
-  // Snapshot tracking
   useEffect(() => {
-    latestSnapshotRef.current = { tiles, rivalTeams, ourTeam, enemyTeams, selectedTileId, selectedRivalTeamId, selectedEnemyTeamId };
-  }, [tiles, rivalTeams, ourTeam, enemyTeams, selectedTileId, selectedRivalTeamId, selectedEnemyTeamId]);
+    latestStoreRef.current = mapStore;
+    latestSnapshotRef.current = activeServerSnapshot;
+  }, [activeServerSnapshot, mapStore]);
 
-  // Save on change
   useEffect(() => {
     if (!hasLoadedStoredMap.current) return;
-    saveStoredMap(tiles, rivalTeams, ourTeam, enemyTeams, selectedTileId);
-  }, [tiles, rivalTeams, ourTeam, enemyTeams, selectedTileId]);
+    void saveStoredMapStore(mapStore);
+  }, [mapStore]);
 
-  // Flush on unload (useEffectEvent for stable callback reference)
   const flushLatestState = useEffectEvent(() => {
-    if (!hasLoadedStoredMap.current || !latestSnapshotRef.current) return;
-    const s = latestSnapshotRef.current;
-    saveStoredMap(s.tiles, s.rivalTeams, s.ourTeam, s.enemyTeams, s.selectedTileId);
+    if (!hasLoadedStoredMap.current) return;
+    void saveStoredMapStore(latestStoreRef.current);
   });
 
   useEffect(() => {
     window.addEventListener("beforeunload", flushLatestState);
-    return () => { window.removeEventListener("beforeunload", flushLatestState); };
+    return () => {
+      window.removeEventListener("beforeunload", flushLatestState);
+    };
   }, [flushLatestState]);
 
-  // Deselect on pointer down outside board (useEffectEvent for stable callback)
   const handlePointerDown = useEffectEvent((event: PointerEvent) => {
     if (!boardRef.current) return;
     if (boardRef.current.contains(event.target as Node)) return;
-    setSelectedTileId("");
+    if (!getCurrentSnapshot().selectedTileId) return;
+
+    patchActiveSnapshot({ selectedTileId: "" });
   });
 
   useEffect(() => {
     document.addEventListener("pointerdown", handlePointerDown);
-    return () => { document.removeEventListener("pointerdown", handlePointerDown); };
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+    };
   }, [handlePointerDown]);
 
-  // Undo keyboard shortcut (Cmd/Ctrl+Z) - useEffectEvent for stable callback reference
   const handleKeyDown = useEffectEvent((event: KeyboardEvent) => {
     if (event.key.toLowerCase() !== "z") return;
     if (!event.metaKey && !event.ctrlKey) return;
     if (event.shiftKey || event.altKey) return;
-    if (!latestSnapshotRef.current || undoStackRef.current.length === 0) return;
+    if (undoStackRef.current.length === 0) return;
 
     event.preventDefault();
     undoLastAction();
@@ -337,62 +559,88 @@ export default function GameMapPage({ navigation }: GameMapPageProps) {
 
   useEffect(() => {
     window.addEventListener("keydown", handleKeyDown);
-    return () => { window.removeEventListener("keydown", handleKeyDown); };
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
   }, [handleKeyDown]);
 
-  // Point summaries (extracted to hook)
-  const { clearMarkerCount, ourTeamPointSummary, rivalPointSummary, enemyPointSummary } = usePointSummaries({ mapConfig, tiles, rivalTeams, enemyTeams });
+  const {
+    clearMarkerCount,
+    ourTeamPointSummary,
+    rivalPointSummary,
+    enemyPointSummary,
+  } = usePointSummaries({ mapConfig, tiles, rivalTeams, enemyTeams });
 
+  const canRemoveActiveServer = mapStore.serverOrder.length > 1;
+  const activeServerLabel = useMemo(() => `Server ${mapStore.activeServerId}`, [mapStore.activeServerId]);
 
-  // Reset map
   function resetMap() {
-    commitAction((c) => ({ ...c, tiles: normalizeMap(mapConfig, c.rivalTeams, c.enemyTeams) }));
+    commitAction((current) => ({
+      ...current,
+      tiles: normalizeMap(mapConfig, current.rivalTeams, current.enemyTeams),
+    }));
   }
 
-  // Team management handlers
-  function updateOurTeamCode(value: string) { commitAction((c) => ({ ...c, ourTeam: { ...c.ourTeam, code: value } })); }
-  function updateOurTeamName(value: string) { commitAction((c) => ({ ...c, ourTeam: { ...c.ourTeam, name: value } })); }
-  function updateOurTeamColor(value: string) { commitAction((c) => ({ ...c, ourTeam: { ...c.ourTeam, color: value } })); }
+  function updateOurTeamCode(value: string) {
+    commitAction((current) => ({
+      ...current,
+      ourTeam: { ...current.ourTeam, code: value },
+    }));
+  }
+
+  function updateOurTeamName(value: string) {
+    commitAction((current) => ({
+      ...current,
+      ourTeam: { ...current.ourTeam, name: value },
+    }));
+  }
+
+  function updateOurTeamColor(value: string) {
+    commitAction((current) => ({
+      ...current,
+      ourTeam: { ...current.ourTeam, color: value },
+    }));
+  }
 
   function addRival() {
     const name = "Rival";
-    const newColor = "#9d8465"; // Next color in rotation
     const newId = createRivalId();
-    commitAction((c) => ({
-      ...c,
-      rivalTeams: [...c.rivalTeams, { id: newId, color: newColor, name, code: generateTeamCode(name) }],
+
+    commitAction((current) => ({
+      ...current,
+      rivalTeams: [
+        ...current.rivalTeams,
+        { id: newId, color: DEFAULT_RIVAL_COLOR, name, code: generateTeamCode(name) },
+      ],
       selectedRivalTeamId: newId,
     }));
   }
 
   function updateRivalCode(id: string, value: string) {
-    commitAction((c) => ({
-      ...c,
-      rivalTeams: c.rivalTeams.map((team) => team.id === id ? { ...team, code: value } : team),
+    commitAction((current) => ({
+      ...current,
+      rivalTeams: current.rivalTeams.map((team) => (team.id === id ? { ...team, code: value } : team)),
     }));
   }
 
   function updateRivalName(id: string, value: string) {
-    commitAction((c) => ({
-      ...c,
-      rivalTeams: c.rivalTeams.map((team) =>
-        team.id === id ? { ...team, name: value, code: syncGeneratedCode(team.code, team.name, value) } : team
+    commitAction((current) => ({
+      ...current,
+      rivalTeams: current.rivalTeams.map((team) =>
+        team.id === id
+          ? { ...team, name: value, code: syncGeneratedCode(team.code, team.name, value) }
+          : team
       ),
     }));
   }
 
   function updateRivalColor(id: string, value: string) {
-    commitAction((c) => {
-      const rivalTeam = c.rivalTeams.find((team) => team.id === id);
-      if (!rivalTeam) return c;
-
-      return {
-        ...c,
-        rivalTeams: c.rivalTeams.map((team) =>
-          team.id === id ? { ...team, color: value } : team
-        ),
-      };
-    });
+    commitAction((current) => ({
+      ...current,
+      rivalTeams: current.rivalTeams.map((team) =>
+        team.id === id ? { ...team, color: value } : team
+      ),
+    }));
   }
 
   function removeRival(id: string) {
@@ -403,18 +651,21 @@ export default function GameMapPage({ navigation }: GameMapPageProps) {
     const shouldSelectClearMarker =
       selectedMarker === "rival" && current.selectedRivalTeamId === rivalTeam.id;
 
-    commitAction((c) => ({
-      ...c,
-      rivalTeams: c.rivalTeams.filter((team) => team.id !== id),
+    commitAction((snapshot) => ({
+      ...snapshot,
+      rivalTeams: snapshot.rivalTeams.filter((team) => team.id !== id),
       tiles: Object.fromEntries(
-        Object.entries(c.tiles).map(([tileId, tile]) => [
+        Object.entries(snapshot.tiles).map(([tileId, tile]) => [
           tileId,
           tile.marker === "rival" && tile.rivalTeamId === rivalTeam.id
-            ? { ...tile, marker: "none" }
+            ? { ...tile, marker: "none", rivalTeamId: undefined }
             : tile,
         ])
       ),
-      selectedRivalTeamId: c.selectedRivalTeamId === rivalTeam.id ? "" : c.selectedRivalTeamId,
+      selectedRivalTeamId:
+        snapshot.selectedRivalTeamId === rivalTeam.id
+          ? snapshot.rivalTeams.find((team) => team.id !== rivalTeam.id)?.id ?? ""
+          : snapshot.selectedRivalTeamId,
     }));
 
     if (shouldSelectClearMarker) {
@@ -423,17 +674,34 @@ export default function GameMapPage({ navigation }: GameMapPageProps) {
   }
 
   function addEnemy() {
-    const newId = createEnemyId();
     const name = "Enemy";
-    commitAction((c) => ({
-      ...c,
-      enemyTeams: [...c.enemyTeams, { id: newId, name, code: generateTeamCode(name) }],
+    const newId = createEnemyId();
+
+    commitAction((current) => ({
+      ...current,
+      enemyTeams: [...current.enemyTeams, { id: newId, name, code: generateTeamCode(name) }],
       selectedEnemyTeamId: newId,
     }));
   }
 
-  function updateEnemyCode(id: string, value: string) { commitAction((c) => ({ ...c, enemyTeams: c.enemyTeams.map(t => t.id === id ? { ...t, code: value } : t) })); }
-  function updateEnemyName(id: string, value: string) { commitAction((c) => ({ ...c, enemyTeams: c.enemyTeams.map(t => t.id === id ? { ...t, name: value, code: syncGeneratedCode(t.code, t.name, value) } : t) })); }
+  function updateEnemyCode(id: string, value: string) {
+    commitAction((current) => ({
+      ...current,
+      enemyTeams: current.enemyTeams.map((team) => (team.id === id ? { ...team, code: value } : team)),
+    }));
+  }
+
+  function updateEnemyName(id: string, value: string) {
+    commitAction((current) => ({
+      ...current,
+      enemyTeams: current.enemyTeams.map((team) =>
+        team.id === id
+          ? { ...team, name: value, code: syncGeneratedCode(team.code, team.name, value) }
+          : team
+      ),
+    }));
+  }
+
   function removeEnemy(id: string) {
     const current = getCurrentSnapshot();
     const enemyTeam = current.enemyTeams.find((team) => team.id === id);
@@ -442,18 +710,21 @@ export default function GameMapPage({ navigation }: GameMapPageProps) {
     const shouldSelectClearMarker =
       selectedMarker === "enemy" && current.selectedEnemyTeamId === enemyTeam.id;
 
-    commitAction((c) => ({
-      ...c,
-      enemyTeams: c.enemyTeams.filter((team) => team.id !== id),
+    commitAction((snapshot) => ({
+      ...snapshot,
+      enemyTeams: snapshot.enemyTeams.filter((team) => team.id !== id),
       tiles: Object.fromEntries(
-        Object.entries(c.tiles).map(([tileId, tile]) => [
+        Object.entries(snapshot.tiles).map(([tileId, tile]) => [
           tileId,
           tile.marker === "enemy" && tile.enemyTeamId === enemyTeam.id
-            ? { ...tile, marker: "none" }
+            ? { ...tile, marker: "none", enemyTeamId: undefined }
             : tile,
         ])
       ),
-      selectedEnemyTeamId: c.selectedEnemyTeamId === enemyTeam.id ? "" : c.selectedEnemyTeamId,
+      selectedEnemyTeamId:
+        snapshot.selectedEnemyTeamId === enemyTeam.id
+          ? snapshot.enemyTeams.find((team) => team.id !== enemyTeam.id)?.id ?? ""
+          : snapshot.selectedEnemyTeamId,
     }));
 
     if (shouldSelectClearMarker) {
@@ -476,8 +747,10 @@ export default function GameMapPage({ navigation }: GameMapPageProps) {
       const nextTile: MapTile = {
         ...existingTile,
         marker: selectedMarker,
-        rivalTeamId: selectedMarker === "rival" ? current.selectedRivalTeamId || undefined : existingTile.rivalTeamId,
-        enemyTeamId: selectedMarker === "enemy" ? current.selectedEnemyTeamId || undefined : existingTile.enemyTeamId,
+        rivalTeamId:
+          selectedMarker === "rival" ? current.selectedRivalTeamId || undefined : existingTile.rivalTeamId,
+        enemyTeamId:
+          selectedMarker === "enemy" ? current.selectedEnemyTeamId || undefined : existingTile.enemyTeamId,
       };
 
       return {
@@ -512,11 +785,87 @@ export default function GameMapPage({ navigation }: GameMapPageProps) {
     });
   }
 
+  function switchServer(serverId: string) {
+    if (serverId === mapStore.activeServerId || !mapStore.serversById[serverId]) return;
+
+    applyMapStore({
+      ...latestStoreRef.current,
+      activeServerId: serverId,
+    });
+    clearUndoHistory();
+  }
+
+  function addServer(serverId: string): boolean {
+    const normalizedServerId = normalizeServerId(serverId);
+    if (!normalizedServerId) return false;
+    if (latestStoreRef.current.serversById[normalizedServerId]) return false;
+
+    const nextStore: MultiServerMapStore = {
+      activeServerId: normalizedServerId,
+      serverOrder: [...latestStoreRef.current.serverOrder, normalizedServerId],
+      serversById: {
+        ...latestStoreRef.current.serversById,
+        [normalizedServerId]: createDefaultServerSnapshot(mapConfig, firstTileId),
+      },
+    };
+
+    applyMapStore(nextStore);
+    clearUndoHistory();
+    return true;
+  }
+
+  function renameActiveServer(serverId: string): boolean {
+    const normalizedServerId = normalizeServerId(serverId);
+    const { activeServerId, serverOrder, serversById } = latestStoreRef.current;
+
+    if (!normalizedServerId) return false;
+    if (normalizedServerId === activeServerId) return true;
+    if (serversById[normalizedServerId]) return false;
+
+    const activeSnapshot = serversById[activeServerId];
+    if (!activeSnapshot) return false;
+
+    const nextServersById = { ...serversById };
+    delete nextServersById[activeServerId];
+    nextServersById[normalizedServerId] = activeSnapshot;
+
+    applyMapStore({
+      activeServerId: normalizedServerId,
+      serverOrder: serverOrder.map((currentServerId) =>
+        currentServerId === activeServerId ? normalizedServerId : currentServerId
+      ),
+      serversById: nextServersById,
+    });
+    clearUndoHistory();
+    return true;
+  }
+
+  function removeActiveServer() {
+    const { activeServerId, serverOrder, serversById } = latestStoreRef.current;
+    if (serverOrder.length <= 1) return;
+    const shouldRemoveServer = window.confirm(
+      `Delete server ${activeServerId}? This will remove its saved map, teams, and tile data.`
+    );
+    if (!shouldRemoveServer) return;
+
+    const activeIndex = serverOrder.indexOf(activeServerId);
+    const nextServerOrder = serverOrder.filter((serverId) => serverId !== activeServerId);
+    const fallbackServerId =
+      nextServerOrder[Math.max(0, activeIndex - 1)] ?? nextServerOrder[0] ?? DEFAULT_SERVER_ID;
+    const { [activeServerId]: _removedServer, ...remainingServers } = serversById;
+
+    applyMapStore({
+      activeServerId: fallbackServerId,
+      serverOrder: nextServerOrder,
+      serversById: remainingServers,
+    });
+    clearUndoHistory();
+  }
+
   function clampMapZoom(value: number) {
     return Math.min(MAX_MAP_ZOOM, Math.max(MIN_MAP_ZOOM, Number(value.toFixed(2))));
   }
 
-  // Render
   const kbdStyle: CSSProperties = {
     display: "inline-flex",
     alignItems: "center",
@@ -539,11 +888,14 @@ export default function GameMapPage({ navigation }: GameMapPageProps) {
         {navigation}
       </div>
       <p style={{ margin: 0, fontSize: "0.8rem", color: "#8a9bc0" }}>
-        Click a tile to select it, then use the toolbar to paint markers.
+        {activeServerLabel}. Click a tile to select it, then use the toolbar to paint markers.
         Right-click a tile to clear it. <kbd style={kbdStyle}>Ctrl+Z</kbd> to undo.
       </p>
 
       <MapToolbar
+        serverIds={mapStore.serverOrder}
+        activeServerId={mapStore.activeServerId}
+        canRemoveActiveServer={canRemoveActiveServer}
         clearMarkerCount={clearMarkerCount}
         selectedMarker={selectedMarker}
         ourTeam={ourTeam}
@@ -551,11 +903,13 @@ export default function GameMapPage({ navigation }: GameMapPageProps) {
         enemyTeams={enemyTeams}
         selectedRivalTeamId={selectedRivalTeamId}
         selectedEnemyTeamId={selectedEnemyTeamId}
+        onServerSelect={switchServer}
+        onServerAdd={addServer}
+        onActiveServerRename={renameActiveServer}
+        onActiveServerRemove={removeActiveServer}
         onMarkerChange={setSelectedMarker}
-        onRivalSelect={(id) => {
-          setSelectedRivalTeamId(id);
-        }}
-        onEnemySelect={setSelectedEnemyTeamId}
+        onRivalSelect={(id) => patchActiveSnapshot({ selectedRivalTeamId: id })}
+        onEnemySelect={(id) => patchActiveSnapshot({ selectedEnemyTeamId: id })}
       />
 
       <div className={`map-layout${panelCollapsed ? " map-layout--panel-collapsed" : ""}`}>
@@ -569,7 +923,7 @@ export default function GameMapPage({ navigation }: GameMapPageProps) {
             enemyTeams={enemyTeams}
             zoom={mapZoom}
             boardRef={boardRef}
-            onTileSelect={setSelectedTileId}
+            onTileSelect={(tileId) => patchActiveSnapshot({ selectedTileId: tileId })}
             onTilePaint={paintTile}
             onTileClear={clearTile}
           />
@@ -623,7 +977,7 @@ export default function GameMapPage({ navigation }: GameMapPageProps) {
           ourTeamPoints={ourTeamPointSummary}
           rivalPoints={rivalPointSummary}
           enemyPoints={enemyPointSummary}
-          onToggleLock={() => setTeamManagementLocked(l => !l)}
+          onToggleLock={() => setTeamManagementLocked((current) => !current)}
           onResetMap={resetMap}
           onUpdateOurTeamCode={updateOurTeamCode}
           onUpdateOurTeamName={updateOurTeamName}

@@ -9,6 +9,8 @@ export type MapTile = {
   note: string;
 };
 
+export type MapTilesById = Record<string, MapTile>;
+
 export type OurTeamConfig = {
   color: string;
   name: string;
@@ -26,6 +28,24 @@ export type EnemyTeam = {
   id: string;
   name: string;
   code: string;
+};
+
+export type ServerId = string;
+
+export type GameMapSnapshot = {
+  tiles: MapTilesById;
+  rivalTeams: RivalTeam[];
+  ourTeam: OurTeamConfig;
+  enemyTeams: EnemyTeam[];
+  selectedTileId: string;
+  selectedRivalTeamId: string;
+  selectedEnemyTeamId: string;
+};
+
+export type MultiServerMapStore = {
+  activeServerId: ServerId;
+  serverOrder: ServerId[];
+  serversById: Record<ServerId, GameMapSnapshot>;
 };
 
 export type MarkerPointSummary = {
