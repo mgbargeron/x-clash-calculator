@@ -162,10 +162,14 @@ export default function EventPlannerDialog({
             </label>
 
             <label className="server-time-field">
-              <span>Server Time</span>
+              <span>Server Time (24h)</span>
               <input
                 className="cell-input"
-                type="time"
+                type="text"
+                inputMode="numeric"
+                pattern="[0-2][0-9]:[0-5][0-9]"
+                placeholder="HH:mm"
+                maxLength={5}
                 value={currentDraft.serverTime}
                 onChange={(inputEvent) =>
                   updateDraft((current) => ({
