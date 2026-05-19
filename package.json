@@ -1,6 +1,6 @@
 {
   "name": "x-clash-chest-multiplier",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Electron + React 19 + Vite app",
   "main": "electron/main.js",
   "private": true,
@@ -20,7 +20,7 @@
   "dependencies": {
     "decimal.js": "10.6.0",
     "react": "19.2.6",
-    "react-dom": "19.2.6 "
+    "react-dom": "19.2.6"
   },
   "devDependencies": {
     "@types/react": "19.2.14",

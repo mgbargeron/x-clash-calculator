@@ -48,5 +48,10 @@ Electron 41 + React 19 + Vite 8 + TypeScript (strict). Single package, no monore
 - Map tiles, toolbar selection state, and score summaries should join rivals/enemies by team id only.
 - If stored map data needs migration, convert legacy display-based references to team ids during normalization.
 
+## Hardening
+- Continue hardening runtime trust boundaries, especially localStorage, Electron IPC payloads, parsed JSON, and user-entered values.
+- Do not rely on TypeScript types alone for persisted or external data; normalize and validate shape and primitive types before calling string/array/object methods.
+- Prefer small defensive coercions at utility/component boundaries when malformed runtime data would otherwise blank the renderer or break packaged builds.
+
 ## Vite quirks
 - `base` is set to `'./'` (relative paths) so the built app works from the Electron file:// protocol.

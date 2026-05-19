@@ -163,8 +163,9 @@ export function clampLeadMinutes(value: number): number {
   return Math.max(0, Math.min(24 * 60, Math.round(value)));
 }
 
-export function sanitizeTimeInput(value: string): string {
-  const match = /^(\d{1,2}):(\d{1,2})$/.exec(value.trim());
+export function sanitizeTimeInput(value: unknown): string {
+  const normalizedValue = typeof value === "string" ? value.trim() : String(value ?? "").trim();
+  const match = /^(\d{1,2}):(\d{1,2})$/.exec(normalizedValue);
   if (!match) return "00:00";
 
   const hours = Math.max(0, Math.min(23, Number(match[1])));
@@ -172,8 +173,9 @@ export function sanitizeTimeInput(value: string): string {
   return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
 }
 
-export function sanitizeDateInput(value: string): string {
-  return /^\d{4}-\d{2}-\d{2}$/.test(value.trim()) ? value : "";
+export function sanitizeDateInput(value: unknown): string {
+  const normalizedValue = typeof value === "string" ? value.trim() : String(value ?? "").trim();
+  return /^\d{4}-\d{2}-\d{2}$/.test(normalizedValue) ? normalizedValue : "";
 }
 
 export function parseTimeToMinutes(value: string): number {

@@ -5,6 +5,67 @@ const path = require('path')
 const mapDataPath = () => path.join(app.getPath('userData'), 'game-map-data.json')
 const serverTimeDataPath = () => path.join(app.getPath('userData'), 'server-time-data.json')
 
+function formatError(error) {
+  if (!error) return 'Unknown error'
+  if (typeof error === 'string') return error
+  if (error && typeof error.message === 'string') return error.message
+  return String(error)
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+function buildErrorPage(title, detail) {
+  return `data:text/html;charset=utf-8,${encodeURIComponent(`<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>${escapeHtml(title)}</title>
+    <style>
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: #10131d;
+        color: #f5f7ff;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        display: grid;
+        place-items: center;
+      }
+      main {
+        width: min(720px, calc(100vw - 32px));
+        padding: 24px;
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+      }
+      h1 {
+        margin: 0 0 12px;
+        font-size: 1.1rem;
+      }
+      pre {
+        margin: 0;
+        white-space: pre-wrap;
+        word-break: break-word;
+        color: #c8d4ff;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>${escapeHtml(title)}</h1>
+      <pre>${escapeHtml(detail)}</pre>
+    </main>
+  </body>
+</html>`)}`
+}
+
 ipcMain.handle('map-storage:get', async () => {
   try {
     const raw = await fs.readFile(mapDataPath(), 'utf8')
@@ -59,6 +120,8 @@ function createWindow() {
   const win = new BrowserWindow({
     width: 1200,
     height: 800,
+    show: false,
+    backgroundColor: '#10131d',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -66,11 +129,37 @@ function createWindow() {
     }
   })
 
+  win.webContents.on('did-finish-load', () => {
+    win.show()
+  })
+
+  win.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL) => {
+    const detail = [
+      `Code: ${errorCode}`,
+      `Message: ${errorDescription}`,
+      `URL: ${validatedURL}`
+    ].join('\n')
+
+    console.error('Renderer failed to load', detail)
+    win.loadURL(buildErrorPage('Failed to load renderer', detail))
+  })
+
+  win.webContents.on('render-process-gone', (_event, details) => {
+    const detail = JSON.stringify(details, null, 2)
+    console.error('Renderer process exited', detail)
+    win.loadURL(buildErrorPage('Renderer process exited', detail))
+  })
+
   if (process.env.VITE_DEV_SERVER_URL) {
     win.loadURL(process.env.VITE_DEV_SERVER_URL)
     win.webContents.openDevTools()
   } else {
-    win.loadFile(path.join(__dirname, '../dist/index.html'))
+    const indexPath = path.join(__dirname, '../dist/index.html')
+    win.loadFile(indexPath).catch((error) => {
+      const detail = `Path: ${indexPath}\nMessage: ${formatError(error)}`
+      console.error('Failed to open bundled index.html', detail)
+      win.loadURL(buildErrorPage('Failed to open bundled app', detail))
+    })
   }
 }
 

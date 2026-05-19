@@ -36,9 +36,9 @@ const markerTools: Array<{ marker: "none"; label: string; icon: string }> = [
 ];
 const ENEMY_COLOR = "#CF3F45";
 
-function formatTeamDisplayLabel(code: string, name: string): string {
-  const normalizedCode = code.substring(0, 3).toUpperCase() || "XXX";
-  const normalizedName = name.trim() || "Unnamed";
+function formatTeamDisplayLabel(code: unknown, name: unknown): string {
+  const normalizedCode = String(code ?? "").slice(0, 3).toUpperCase() || "XXX";
+  const normalizedName = String(name ?? "").trim() || "Unnamed";
   return `[${normalizedCode}]${normalizedName}`;
 }
 

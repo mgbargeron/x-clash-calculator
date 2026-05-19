@@ -1,7 +1,7 @@
 import {sanitizeNumericInput} from "./sanitizeNumericInput";
 import Decimal from "decimal.js";
 
-export function formatInputValue(input: string) {
+export function formatInputValue(input: unknown) {
   const sanitized = sanitizeNumericInput(input)
 
   if (sanitized === '') {
@@ -13,10 +13,16 @@ export function formatInputValue(input: string) {
   }
 
   const [wholePart, fractionalPart] = sanitized.split('.')
-  const formattedWhole = new Decimal(wholePart || '0').toFixed(0).replace(
-    /\B(?=(\d{3})+(?!\d))/g,
-    ','
-  )
+  let formattedWhole = '0'
+
+  try {
+    formattedWhole = new Decimal(wholePart || '0').toFixed(0).replace(
+      /\B(?=(\d{3})+(?!\d))/g,
+      ','
+    )
+  } catch {
+    return ''
+  }
 
   return fractionalPart !== undefined
     ? `${formattedWhole}.${fractionalPart}`
