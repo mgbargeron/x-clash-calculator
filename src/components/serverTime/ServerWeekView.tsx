@@ -43,13 +43,20 @@ export default function ServerWeekView({
     Object.fromEntries(Array.from({length: 7}, (_, index) => [index, false]))
   );
   const [expandedEventSlots, setExpandedEventSlots] = useState<Record<string, boolean>>({});
+  const isEventVisible = (event: PlannerEvent, serverDate: string): boolean =>
+    !event.skippedDates.includes(serverDate);
+
   const dayHeaders = weekHours.map((dayHours, dayIndex) => ({
     dayIndex,
     label: formatServerDay(dayIndex),
     localDateLabel: formatLocalDateTime(dayHours[0]?.localDate ?? weekStart),
-    visibleSlots: (showAllByDay[dayIndex] ? dayHours : dayHours.filter((slot) => slot.matchingEvents.length > 0)).length,
+    visibleSlots: (showAllByDay[dayIndex] ? dayHours : dayHours.filter((slot) =>
+      slot.matchingEvents.some((e) => isEventVisible(e, slot.serverDate))
+    )).length,
   }));
-  const eventSlotKeys = weekHours.flat().filter((slot) => slot.matchingEvents.length > 0).map((slot) => slot.key);
+  const eventSlotKeys = weekHours.flat().filter((slot) =>
+    slot.matchingEvents.some((e) => isEventVisible(e, slot.serverDate))
+  ).map((slot) => slot.key);
   const allEventsExpanded = eventSlotKeys.length > 0 && eventSlotKeys.every((key) => expandedEventSlots[key]);
 
   return (
@@ -105,7 +112,11 @@ export default function ServerWeekView({
               <div className="server-week-day-scroll">
                 {(showAllByDay[header.dayIndex]
                   ? weekHours[header.dayIndex]
-                  : weekHours[header.dayIndex].filter((slot) => slot.matchingEvents.length > 0)
+                  : weekHours[header.dayIndex].filter((slot) =>
+                      slot.matchingEvents.some(
+                        (event) => event.enabled && !event.skippedDates.includes(slot.serverDate)
+                      )
+                    )
                 ).map((slot) => (
                   <DayCell
                     key={slot.key}
@@ -145,12 +156,10 @@ type DayCellProps = {
 };
 
 function DayCell({slot, isExpanded, selectedTimezones, onSelectSlot, onEditEvent, onRemoveEvent, onToggleSkipSlot, onToggleExpanded}: DayCellProps) {
-  const hasEvent = slot.matchingEvents.length > 0;
+  const filteredEvents = slot.matchingEvents.filter((event) => !event.skippedDates.includes(slot.serverDate));
+  const hasEvent = filteredEvents.length > 0;
 
-  const isDateSkipped = (event: PlannerEvent): boolean =>
-    slot && event.skippedDates.includes(slot.serverDate);
-
-  return (
+  return hasEvent ? (
     <div
       className={`server-week-cell ${slot.isCurrentHour ? "current" : ""} ${hasEvent ? "has-event" : ""}`}
       title={`${formatServerDay(slot.serverDayOfWeek)} ${slot.serverLabel} -> ${formatLocalDateTime(slot.localDate)}`}
@@ -175,19 +184,19 @@ function DayCell({slot, isExpanded, selectedTimezones, onSelectSlot, onEditEvent
           </div>
         ) : null}
       </button>
-      {slot.matchingEvents.length > 0 ? (
+      {filteredEvents.length > 0 ? (
         <details
           className="server-week-events-dropdown"
           open={isExpanded}
           onToggle={(event) => onToggleExpanded(event.currentTarget.open)}
         >
           <summary>
-            <span>Show {slot.matchingEvents.length} event{slot.matchingEvents.length === 1 ? "" : "s"}</span>
+            <span>Show {filteredEvents.length} event{filteredEvents.length === 1 ? "" : "s"}</span>
             <span className="server-week-events-toggle-icon" aria-hidden="true">▾</span>
           </summary>
           <div className="server-week-events-list">
-            {slot.matchingEvents.map((event) => (
-              <div className={`server-week-event-row ${isDateSkipped(event) ? "event-row--skipped" : ""}`} key={event.id}>
+            {filteredEvents.map((event) => (
+              <div className="server-week-event-row" key={event.id}>
                 <div className="server-week-event-row-header">
                   <strong>{event.name || "Unnamed event"}</strong>
                   <div className="event-row-actions">
@@ -204,16 +213,16 @@ function DayCell({slot, isExpanded, selectedTimezones, onSelectSlot, onEditEvent
                     </button>
                     {slot.serverDate && event.type !== "oneTime" ? (
                       <button
-                        className={isDateSkipped(event) ? "event-skip-active" : "event-skip"}
+                        className="event-skip"
                         type="button"
-                        title={isDateSkipped(event) ? "Unskip this date" : "Skip this date"}
+                        title="Skip this date"
                         onClick={(clickEvent) => {
                           clickEvent.preventDefault();
                           clickEvent.stopPropagation();
                           onToggleSkipSlot(event.id, slot.serverDate);
                         }}
                       >
-                        {isDateSkipped(event) ? "↑ Skip" : "Skip"}
+                        Skip
                       </button>
                     ) : null}
                     <button
@@ -244,7 +253,7 @@ function DayCell({slot, isExpanded, selectedTimezones, onSelectSlot, onEditEvent
         </div>
       )}
     </div>
-  );
+  ) : null;
 }
 
 function shortTimezoneLabel(timezone: string): string {

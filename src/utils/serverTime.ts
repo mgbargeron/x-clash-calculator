@@ -299,6 +299,7 @@ export function getNextEventOccurrence(
     const serverDayOfWeek = (context.serverDayOfWeek + dayOffset) % 7;
     const serverDate = toDateInputString(new Date(dayStart.getTime() + DAY_MS));
 
+    if (event.skippedDates.includes(serverDate)) continue;
     if (eventMatchesSlot(event, serverDayOfWeek, eventMinutes, serverDate)) {
       return occurrence;
     }
