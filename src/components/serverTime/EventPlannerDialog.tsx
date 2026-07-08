@@ -11,6 +11,14 @@ import {
   type ServerWeekHour,
 } from "../../utils/serverTime";
 
+type TimeOption = { value: string; label: string };
+
+const TIME_OPTIONS: TimeOption[] = Array.from({length: 96}, (_, i) => {
+  const h = Math.floor(i / 4);
+  const m = (i % 4) * 15;
+  return { value: `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`, label: `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}` };
+});
+
 type EventPlannerDialogProps = {
   open: boolean;
   slot: ServerWeekHour | null;
@@ -67,7 +75,7 @@ export default function EventPlannerDialog({
   }, [open, onClose]);
 
   function buildDraft(event: PlannerEvent | null, slot: ServerWeekHour | null, state: ServerTimePlannerState): PlannerEvent | null {
-    if (!open || (!event && !slot)) return null;
+    if (!open) return null;
 
     if (event) {
       return {
@@ -80,7 +88,7 @@ export default function EventPlannerDialog({
       return createPlannerEvent(state.settings.defaultAlarmLeadMinutes, {
         type: "oneTime",
         serverDayOfWeek: slot.serverDayOfWeek,
-        serverTime: `${String(slot.serverHour).padStart(2, "0")}:00`,
+        serverTime: slot.serverLabel,
         oneTimeServerDate: slot.serverDate,
         alternatingWeek: state.alternatingWeekState?.currentWeek ?? "A",
         alternatingAnchorDate: slot.serverDate,
@@ -88,7 +96,7 @@ export default function EventPlannerDialog({
       });
     }
 
-    return null;
+    return createPlannerEvent(state.settings.defaultAlarmLeadMinutes);
   }
 
   if (!open || !draft) return null;
@@ -192,21 +200,20 @@ export default function EventPlannerDialog({
 
             <label className="server-time-field">
               <span>Server Time (24h)</span>
-              <input
+              <select
                 className="cell-input"
-                type="text"
-                inputMode="numeric"
-                pattern="[0-2][0-9]:[0-5][0-9]"
-                placeholder="HH:mm"
-                maxLength={5}
                 value={currentDraft.serverTime}
                 onChange={(inputEvent) =>
                   updateDraft((current) => ({
                     ...current,
-                    serverTime: sanitizeTimeInput(inputEvent.target.value),
+                    serverTime: inputEvent.target.value,
                   }))
                 }
-              />
+              >
+                {TIME_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
             </label>
 
             {currentDraft.type === "oneTime" ? (

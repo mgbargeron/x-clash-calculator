@@ -490,6 +490,7 @@ export default function ServerTimePage({navigation}: ServerTimePageProps) {
         events={plannerState.events}
         selectedTimezones={plannerState.settings.extraTimezones}
         onSelectSlot={createEventFromSlot}
+        onEditEvent={editEvent}
         onRemoveEvent={removeEvent}
         onToggleSkipSlot={toggleSkipDate}
       />

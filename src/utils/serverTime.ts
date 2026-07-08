@@ -384,14 +384,18 @@ export function buildServerWeekHours(
   selectedTimezones: string[]
 ): ServerWeekHour[][] {
   const currentContext = getServerContext(now, settings);
+  const MINUTES_PER_SLOT = 15;
 
   return Array.from({length: 7}, (_, dayIndex) =>
-    Array.from({length: 24}, (_, hour) => {
+    Array.from({length: 96}, (_, slotIndex) => {
+      const slotMinutes = slotIndex * MINUTES_PER_SLOT;
+      const hours = Math.floor(slotMinutes / 60);
+      const minutes = slotMinutes % 60;
       const dayStart = new Date(weekStart.getTime() + dayIndex * DAY_MS);
-      const localDate = new Date(dayStart.getTime() + hour * 60 * 60_000);
+      const localDate = new Date(dayStart.getTime() + slotMinutes * 60_000);
       const serverDate = toDateInputString(new Date(dayStart.getTime() + DAY_MS));
       const serverWeekStartDate = toDateInputString(weekStart);
-      const serverLabel = `${String(hour).padStart(2, "0")}:00`;
+      const serverLabel = `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
       const timezoneLabels = selectedTimezones.reduce<Record<string, string>>((acc, timezone) => {
         acc[timezone] = formatTimeOnlyInZone(localDate, timezone);
         return acc;
@@ -401,22 +405,22 @@ export function buildServerWeekHours(
         eventMatchesSlot(
           event,
           dayIndex,
-          hour * 60,
+          slotMinutes,
           serverDate
         )
       );
 
       return {
-        key: `${dayIndex}-${hour}`,
+        key: `${dayIndex}-${slotIndex}`,
         serverDayOfWeek: dayIndex,
-        serverHour: hour,
+        serverHour: hours,
         serverLabel,
         serverDate,
         serverWeekStartDate,
         localDate,
         localLabel: formatTimeOnly(localDate),
         timezoneLabels,
-        isCurrentHour: currentContext.serverDayOfWeek === dayIndex && Math.floor(currentContext.serverMinutes / 60) === hour,
+        isCurrentHour: currentContext.serverDayOfWeek === dayIndex && Math.floor(currentContext.serverMinutes / MINUTES_PER_SLOT) === slotIndex,
         matchingEvents,
       };
     })
@@ -560,7 +564,7 @@ function eventMatchesSlot(
   serverDate: string
 ): boolean {
   const eventMinutes = parseTimeToMinutes(event.serverTime);
-  if (eventMinutes < slotMinutes || eventMinutes >= slotMinutes + 60) return false;
+  if (eventMinutes < slotMinutes || eventMinutes >= slotMinutes + 15) return false;
 
   switch (event.type) {
     case "oneTime":

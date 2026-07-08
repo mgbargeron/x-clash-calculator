@@ -16,6 +16,7 @@ type ServerWeekViewProps = {
   events: PlannerEvent[];
   selectedTimezones: string[];
   onSelectSlot: (slot: ServerWeekHour) => void;
+  onEditEvent: (eventId: string) => void;
   onRemoveEvent: (eventId: string) => void;
   onToggleSkipSlot: (eventId: string, serverDate: string) => void;
 };
@@ -27,6 +28,7 @@ export default function ServerWeekView({
   events,
   selectedTimezones,
   onSelectSlot,
+  onEditEvent,
   onRemoveEvent,
   onToggleSkipSlot,
 }: ServerWeekViewProps) {
@@ -111,6 +113,7 @@ export default function ServerWeekView({
                     isExpanded={Boolean(expandedEventSlots[slot.key])}
                     selectedTimezones={selectedTimezones}
                     onSelectSlot={onSelectSlot}
+                    onEditEvent={onEditEvent}
                     onRemoveEvent={onRemoveEvent}
                     onToggleSkipSlot={onToggleSkipSlot}
                     onToggleExpanded={(nextOpen) =>
@@ -135,12 +138,13 @@ type DayCellProps = {
   isExpanded: boolean;
   selectedTimezones: string[];
   onSelectSlot: (slot: ServerWeekHour) => void;
+  onEditEvent: (eventId: string) => void;
   onRemoveEvent: (eventId: string) => void;
   onToggleSkipSlot: (eventId: string, serverDate: string) => void;
   onToggleExpanded: (nextOpen: boolean) => void;
 };
 
-function DayCell({slot, isExpanded, selectedTimezones, onSelectSlot, onRemoveEvent, onToggleSkipSlot, onToggleExpanded}: DayCellProps) {
+function DayCell({slot, isExpanded, selectedTimezones, onSelectSlot, onEditEvent, onRemoveEvent, onToggleSkipSlot, onToggleExpanded}: DayCellProps) {
   const hasEvent = slot.matchingEvents.length > 0;
 
   const isDateSkipped = (event: PlannerEvent): boolean =>
@@ -187,6 +191,17 @@ function DayCell({slot, isExpanded, selectedTimezones, onSelectSlot, onRemoveEve
                 <div className="server-week-event-row-header">
                   <strong>{event.name || "Unnamed event"}</strong>
                   <div className="event-row-actions">
+                    <button
+                      className="secondary-button event-edit-btn"
+                      type="button"
+                      onClick={(clickEvent) => {
+                        clickEvent.preventDefault();
+                        clickEvent.stopPropagation();
+                        onEditEvent(event.id);
+                      }}
+                    >
+                      Edit
+                    </button>
                     {slot.serverDate && event.type !== "oneTime" ? (
                       <button
                         className={isDateSkipped(event) ? "event-skip-active" : "event-skip"}
