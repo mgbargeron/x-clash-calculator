@@ -29,6 +29,7 @@ export default function EventPlannerDialog({
   onSave,
 }: EventPlannerDialogProps) {
   const [draft, setDraft] = useState<PlannerEvent | null>(null);
+  const [skipChecked, setSkipChecked] = useState(false);
   const prevOpenRef = useRef(open);
   const prevEventRef = useRef(editingEvent);
   const prevSlotRef = useRef(slot);
@@ -48,6 +49,9 @@ export default function EventPlannerDialog({
     const newDraft = buildDraft(editingEvent, slot, plannerState);
     if (newDraft) {
       setDraft(newDraft);
+      if (slot && newDraft.type !== "oneTime") {
+        setSkipChecked(newDraft.skippedDates.includes(slot.serverDate));
+      }
     }
   }, [open, editingEvent, slot, plannerState]);
 
@@ -103,14 +107,28 @@ export default function EventPlannerDialog({
   }
 
   function submit() {
-    onSave({
+    let eventToSave = {
       ...currentDraft,
       name: currentDraft.name.trim(),
       alarmEnabled: false,
       oneTimeServerDate: sanitizeDateInput(currentDraft.oneTimeServerDate),
       serverTime: sanitizeTimeInput(currentDraft.serverTime),
-    });
+    };
+
+    if (slot && eventToSave.type !== "oneTime") {
+      const dates = skipChecked
+        ? [...eventToSave.skippedDates, slot.serverDate]
+        : eventToSave.skippedDates.filter((d) => d !== slot.serverDate);
+      eventToSave = {
+        ...eventToSave,
+        skippedDates: dates,
+      };
+    }
+
+    onSave(eventToSave);
   }
+
+  const isRecurringEvent = currentDraft.type !== "oneTime";
 
   return (
     <div className="event-dialog-backdrop" role="presentation" onClick={onClose}>
@@ -261,6 +279,17 @@ export default function EventPlannerDialog({
               />
               <span>Enabled</span>
             </label>
+
+            {isRecurringEvent && slot ? (
+              <label className="server-time-toggle">
+                <input
+                  type="checkbox"
+                  checked={skipChecked}
+                  onChange={(inputEvent) => setSkipChecked(inputEvent.target.checked)}
+                />
+                <span>Skipped for this date</span>
+              </label>
+            ) : null}
           </div>
         </div>
 

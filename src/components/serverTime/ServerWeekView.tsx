@@ -17,6 +17,7 @@ type ServerWeekViewProps = {
   selectedTimezones: string[];
   onSelectSlot: (slot: ServerWeekHour) => void;
   onRemoveEvent: (eventId: string) => void;
+  onToggleSkipSlot: (eventId: string, serverDate: string) => void;
 };
 
 export default function ServerWeekView({
@@ -27,6 +28,7 @@ export default function ServerWeekView({
   selectedTimezones,
   onSelectSlot,
   onRemoveEvent,
+  onToggleSkipSlot,
 }: ServerWeekViewProps) {
   const weekHours = buildServerWeekHours(
     weekStart,
@@ -110,6 +112,7 @@ export default function ServerWeekView({
                     selectedTimezones={selectedTimezones}
                     onSelectSlot={onSelectSlot}
                     onRemoveEvent={onRemoveEvent}
+                    onToggleSkipSlot={onToggleSkipSlot}
                     onToggleExpanded={(nextOpen) =>
                       setExpandedEventSlots((current) => ({
                         ...current,
@@ -133,11 +136,15 @@ type DayCellProps = {
   selectedTimezones: string[];
   onSelectSlot: (slot: ServerWeekHour) => void;
   onRemoveEvent: (eventId: string) => void;
+  onToggleSkipSlot: (eventId: string, serverDate: string) => void;
   onToggleExpanded: (nextOpen: boolean) => void;
 };
 
-function DayCell({slot, isExpanded, selectedTimezones, onSelectSlot, onRemoveEvent, onToggleExpanded}: DayCellProps) {
+function DayCell({slot, isExpanded, selectedTimezones, onSelectSlot, onRemoveEvent, onToggleSkipSlot, onToggleExpanded}: DayCellProps) {
   const hasEvent = slot.matchingEvents.length > 0;
+
+  const isDateSkipped = (event: PlannerEvent): boolean =>
+    slot && event.skippedDates.includes(slot.serverDate);
 
   return (
     <div
@@ -176,24 +183,40 @@ function DayCell({slot, isExpanded, selectedTimezones, onSelectSlot, onRemoveEve
           </summary>
           <div className="server-week-events-list">
             {slot.matchingEvents.map((event) => (
-              <div className="server-week-event-row" key={event.id}>
+              <div className={`server-week-event-row ${isDateSkipped(event) ? "event-row--skipped" : ""}`} key={event.id}>
                 <div className="server-week-event-row-header">
                   <strong>{event.name || "Unnamed event"}</strong>
-                  <button
-                    className="server-week-event-remove"
-                    type="button"
-                    aria-label={`Remove ${event.name || "event"}`}
-                    onClick={(clickEvent) => {
-                      clickEvent.preventDefault();
-                      clickEvent.stopPropagation();
+                  <div className="event-row-actions">
+                    {slot.serverDate && event.type !== "oneTime" ? (
+                      <button
+                        className={isDateSkipped(event) ? "event-skip-active" : "event-skip"}
+                        type="button"
+                        title={isDateSkipped(event) ? "Unskip this date" : "Skip this date"}
+                        onClick={(clickEvent) => {
+                          clickEvent.preventDefault();
+                          clickEvent.stopPropagation();
+                          onToggleSkipSlot(event.id, slot.serverDate);
+                        }}
+                      >
+                        {isDateSkipped(event) ? "↑ Skip" : "Skip"}
+                      </button>
+                    ) : null}
+                    <button
+                      className="server-week-event-remove"
+                      type="button"
+                      aria-label={`Remove ${event.name || "event"}`}
+                      onClick={(clickEvent) => {
+                        clickEvent.preventDefault();
+                        clickEvent.stopPropagation();
 
-                      if (window.confirm(`Remove "${event.name || "Unnamed event"}"?`)) {
-                        onRemoveEvent(event.id);
-                      }
-                    }}
-                  >
-                    ×
-                  </button>
+                        if (window.confirm(`Remove "${event.name || "Unnamed event"}"?`)) {
+                          onRemoveEvent(event.id);
+                        }
+                      }}
+                    >
+                      ×
+                    </button>
+                  </div>
                 </div>
                 <span>{event.serverTime}</span>
               </div>

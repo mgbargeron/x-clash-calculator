@@ -14,6 +14,7 @@ export type PlannerEvent = {
   enabled: boolean;
   alarmEnabled: boolean;
   alarmLeadMinutes: number;
+  skippedDates: string[];
 };
 
 export type AlternatingWeekState = {
@@ -84,6 +85,7 @@ export const DEFAULT_SERVER_TIME_STATE: ServerTimePlannerState = {
       enabled: true,
       alarmEnabled: true,
       alarmLeadMinutes: 15,
+      skippedDates: [],
     },
     {
       id: "weekly-war",
@@ -98,6 +100,7 @@ export const DEFAULT_SERVER_TIME_STATE: ServerTimePlannerState = {
       enabled: false,
       alarmEnabled: false,
       alarmLeadMinutes: 30,
+      skippedDates: [],
     },
   ],
   acknowledgedAlarmKeys: [],
@@ -128,7 +131,7 @@ export function createPlannerEvent(
   preset?: Partial<PlannerEvent>
 ): PlannerEvent {
   const nextServerTime = sanitizeTimeInput(preset?.serverTime ?? "00:00");
-  const baseEvent: PlannerEvent = {
+const baseEvent: PlannerEvent = {
     id: createStableId("planner"),
     name: "",
     type: "daily",
@@ -141,6 +144,7 @@ export function createPlannerEvent(
     enabled: true,
     alarmEnabled: false,
     alarmLeadMinutes: defaultLeadMinutes,
+    skippedDates: [],
   };
 
   return {
@@ -488,6 +492,9 @@ function normalizeEvent(raw: unknown, index: number, fallbackLeadMinutes: number
     alarmLeadMinutes: clampLeadMinutes(
       typeof event.alarmLeadMinutes === "number" ? event.alarmLeadMinutes : fallbackLeadMinutes
     ),
+    skippedDates: Array.isArray(event.skippedDates)
+      ? (event.skippedDates as unknown[]).filter((d): d is string => typeof d === "string")
+      : [],
   };
 }
 

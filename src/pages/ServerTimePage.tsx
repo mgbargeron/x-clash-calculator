@@ -205,6 +205,22 @@ export default function ServerTimePage({navigation}: ServerTimePageProps) {
     }));
   }
 
+  function toggleSkipDate(eventId: string, serverDate: string) {
+    setPlannerState((current) => ({
+      ...current,
+      events: current.events.map((event) => {
+        if (event.id !== eventId) return event;
+        const isSkipped = event.skippedDates.includes(serverDate);
+        return {
+          ...event,
+          skippedDates: isSkipped
+            ? event.skippedDates.filter((d) => d !== serverDate)
+            : [...event.skippedDates, serverDate],
+        };
+      }),
+    }));
+  }
+
   function toggleTimezone(timezone: string) {
     updateSettings((current) => {
       const exists = current.extraTimezones.includes(timezone);
@@ -475,6 +491,7 @@ export default function ServerTimePage({navigation}: ServerTimePageProps) {
         selectedTimezones={plannerState.settings.extraTimezones}
         onSelectSlot={createEventFromSlot}
         onRemoveEvent={removeEvent}
+        onToggleSkipSlot={toggleSkipDate}
       />
 
       <section className="server-time-panel">

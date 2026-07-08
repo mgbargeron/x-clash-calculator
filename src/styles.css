@@ -700,6 +700,46 @@ body {
     font-size: 0.78rem;
 }
 
+.event-row-actions {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+}
+
+.event-skip,
+.event-skip-active {
+    padding: 2px 8px;
+    border-radius: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: rgba(255, 255, 255, 0.08);
+    color: #aab4ff;
+    font-size: 0.72rem;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.2s;
+}
+
+.event-skip:hover {
+    background: rgba(100, 80, 200, 0.25);
+    border-color: rgba(100, 80, 200, 0.5);
+}
+
+.event-skip-active {
+    background: rgba(255, 170, 50, 0.15);
+    border-color: rgba(255, 170, 50, 0.5);
+    color: #ffb562;
+}
+
+.server-week-event-row.event-row--skipped {
+    opacity: 0.5;
+    text-decoration: line-through;
+}
+
+.server-week-event-row.event-row--skipped strong {
+    text-decoration: line-through;
+}
+
 .server-week-cell.has-event .server-week-event-row span {
     color: #ffe7a5;
 }
