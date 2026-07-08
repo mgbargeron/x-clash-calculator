@@ -2,10 +2,12 @@ import {useEffect, useMemo, useRef, useState, type ReactNode} from "react";
 
 import EventPlannerDialog from "../components/serverTime/EventPlannerDialog";
 import ServerWeekView from "../components/serverTime/ServerWeekView";
+import {useServerTimeDataLoader} from "../hooks/useServerTimeDataLoader";
+import {useServerTimeDataSaver} from "../hooks/useServerTimeDataSaver";
+import {useNowRefresher} from "../hooks/useNowRefresher";
 import {
   type AlternatingWeek,
   CURATED_TIMEZONES,
-  DEFAULT_SERVER_TIME_STATE,
   formatDuration,
   formatLocalDateTime,
   formatNowInZone,
@@ -17,14 +19,12 @@ import {
   getNextEventOccurrence,
   getResolvedAlternatingWeekState,
   getServerContext,
-  normalizePlannerState,
   sanitizeTimeInput,
   type PlannerEvent,
   type ServerTimePlannerState,
   type ServerWeekHour,
 } from "../utils/serverTime";
 
-const STORAGE_KEY = "server-time-planner-v1";
 const MAX_TIMEZONES = 6;
 
 type ServerTimePageProps = {
@@ -39,9 +39,8 @@ type UpcomingAlarm = {
 };
 
 export default function ServerTimePage({navigation}: ServerTimePageProps) {
-  const [plannerState, setPlannerState] = useState<ServerTimePlannerState>(DEFAULT_SERVER_TIME_STATE);
-  const [isLoaded, setIsLoaded] = useState(false);
-  const [now, setNow] = useState(() => new Date());
+  const {plannerState, setPlannerState, isLoaded} = useServerTimeDataLoader();
+  const now = useNowRefresher();
   const [eventsPanelOpen, setEventsPanelOpen] = useState(false);
   const [creatingEvent, setCreatingEvent] = useState(false);
   const [dialogSlot, setDialogSlot] = useState<ServerWeekHour | null>(null);
@@ -50,58 +49,6 @@ export default function ServerTimePage({navigation}: ServerTimePageProps) {
     typeof Notification === "undefined" ? "unsupported" : Notification.permission
   );
   const lastNotifiedAlarmRef = useRef<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function load() {
-      let raw: unknown = null;
-
-      if (window.electronAPI.getServerTimeData) {
-        try {
-          raw = await window.electronAPI.getServerTimeData();
-        } catch {
-          raw = null;
-        }
-      }
-
-      if (!raw) {
-        try {
-          raw = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "null");
-        } catch {
-          raw = null;
-        }
-      }
-
-      if (!cancelled) {
-        setPlannerState(normalizePlannerState(raw));
-        setIsLoaded(true);
-      }
-    }
-
-    void load();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    const refreshNow = () => setNow(new Date());
-    const timer = window.setInterval(refreshNow, 60_000);
-    const onFocus = () => refreshNow();
-    const onVisibilityChange = () => {
-      if (document.visibilityState === "visible") refreshNow();
-    };
-
-    window.addEventListener("focus", onFocus);
-    document.addEventListener("visibilitychange", onVisibilityChange);
-
-    return () => {
-      window.clearInterval(timer);
-      window.removeEventListener("focus", onFocus);
-      document.removeEventListener("visibilitychange", onVisibilityChange);
-    };
-  }, []);
 
   useEffect(() => {
     if (!isLoaded) return;
@@ -126,16 +73,7 @@ export default function ServerTimePage({navigation}: ServerTimePageProps) {
     });
   }, [isLoaded, now]);
 
-  useEffect(() => {
-    if (!isLoaded) return;
-
-    const serialized = JSON.stringify(plannerState);
-    localStorage.setItem(STORAGE_KEY, serialized);
-
-    if (window.electronAPI.setServerTimeData) {
-      void window.electronAPI.setServerTimeData(plannerState);
-    }
-  }, [isLoaded, plannerState]);
+  useServerTimeDataSaver(plannerState, isLoaded);
 
   const localTimezone = useMemo(
     () => Intl.DateTimeFormat().resolvedOptions().timeZone || "Local",

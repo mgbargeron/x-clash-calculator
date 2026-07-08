@@ -1,5 +1,6 @@
-import {useEffect, useState} from "react";
+import {useState} from "react";
 import {sanitizeNumericInput} from "./utils/sanitizeNumericInput";
+import {useGridValuesPersistence} from "./hooks/useGridValuesPersistence";
 import CalculatorPage from "./pages/CalculatorPage";
 import HeroExpPage from "./pages/HeroExpPage";
 import GameMapPage from "./pages/GameMapPage";
@@ -54,9 +55,7 @@ export default function App() {
     );
   };
 
-  useEffect(() => {
-    localStorage.setItem(GRID_STORAGE_KEY, JSON.stringify(gridValues));
-  }, [gridValues]);
+  useGridValuesPersistence(gridValues);
 
   const navigation = (
     <nav className="app-nav" aria-label="Primary navigation">

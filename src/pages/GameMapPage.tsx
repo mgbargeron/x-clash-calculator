@@ -1,4 +1,4 @@
-import { useEffect, useEffectEvent, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import {useEffect, useEffectEvent, useMemo, useRef, useState, type CSSProperties, type ReactNode} from "react";
 
 import {
   MapBoard,
@@ -17,6 +17,10 @@ import type {
   TileMarker,
 } from "../components/gameMap/types";
 import { usePointSummaries } from "../hooks/usePointSummaries";
+import { useSeasonPersistence } from "../hooks/useSeasonPersistence";
+import { useDeselectTileOnOutsideClick } from "../hooks/useDeselectTileOnOutsideClick";
+import { useUndoKeyboardShortcut } from "../hooks/useUndoKeyboardShortcut";
+import { useBeforeUnloadSave } from "../hooks/useBeforeUnloadSave";
 import { getSeasonConfig } from "../utils/gameMapConfig";
 import type { Season, GameMapConfig } from "../utils/gameMapConfig";
 
@@ -435,13 +439,7 @@ export default function GameMapPage({ navigation }: GameMapPageProps) {
   const mapConfig = getSeasonConfig(activeSeason);
   const firstTileId = mapConfig.tiles[0]?.id ?? "";
 
-  useEffect(() => {
-    try {
-      localStorage.setItem(SEASON_STORAGE_KEY, String(activeSeason));
-    } catch {
-      // Ignore storage errors.
-    }
-  }, [activeSeason]);
+  useSeasonPersistence(activeSeason);
 
   const boardRef = useRef<HTMLDivElement | null>(null);
   const hasLoadedStoredMap = useRef(false);
@@ -513,14 +511,6 @@ export default function GameMapPage({ navigation }: GameMapPageProps) {
     undoStackRef.current = [];
   }
 
-  function undoLastAction() {
-    const snapshotToRestore = undoStackRef.current[0];
-    if (!snapshotToRestore) return;
-
-    undoStackRef.current = undoStackRef.current.slice(1);
-    applyActiveSnapshot(snapshotToRestore);
-  }
-
   useEffect(() => {
     let cancelled = false;
 
@@ -552,44 +542,18 @@ export default function GameMapPage({ navigation }: GameMapPageProps) {
     void saveStoredMapStore(latestStoreRef.current, activeSeason);
   });
 
-  useEffect(() => {
-    window.addEventListener("beforeunload", flushLatestState);
-    return () => {
-      window.removeEventListener("beforeunload", flushLatestState);
-    };
-  }, [flushLatestState]);
+  useBeforeUnloadSave(flushLatestState);
 
-  const handlePointerDown = useEffectEvent((event: PointerEvent) => {
-    if (!boardRef.current) return;
-    if (boardRef.current.contains(event.target as Node)) return;
-    if (!getCurrentSnapshot().selectedTileId) return;
-
-    patchActiveSnapshot({ selectedTileId: "" });
+  useDeselectTileOnOutsideClick(boardRef, (tileId: string) => {
+    patchActiveSnapshot({ selectedTileId: tileId });
   });
 
-  useEffect(() => {
-    document.addEventListener("pointerdown", handlePointerDown);
-    return () => {
-      document.removeEventListener("pointerdown", handlePointerDown);
-    };
-  }, [handlePointerDown]);
-
-  const handleKeyDown = useEffectEvent((event: KeyboardEvent) => {
-    if (event.key.toLowerCase() !== "z") return;
-    if (!event.metaKey && !event.ctrlKey) return;
-    if (event.shiftKey || event.altKey) return;
-    if (undoStackRef.current.length === 0) return;
-
-    event.preventDefault();
-    undoLastAction();
+  useUndoKeyboardShortcut(() => {
+    const snapshotToRestore = undoStackRef.current[0];
+    if (!snapshotToRestore) return;
+    undoStackRef.current = undoStackRef.current.slice(1);
+    applyActiveSnapshot(snapshotToRestore);
   });
-
-  useEffect(() => {
-    window.addEventListener("keydown", handleKeyDown);
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [handleKeyDown]);
 
   const {
     clearMarkerCount,

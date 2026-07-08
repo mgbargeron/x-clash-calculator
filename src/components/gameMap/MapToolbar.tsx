@@ -1,5 +1,6 @@
-import { useEffect, useState, type CSSProperties } from "react";
+import { useState, type CSSProperties } from "react";
 import type { TileMarker } from "./types";
+import { useMapToolbarServerControls } from "../../hooks/useMapToolbarServerControls";
 
 type RivalButtonStyle = CSSProperties & {
   "--rival-color": string;
@@ -61,18 +62,18 @@ export function MapToolbar({
   onRivalSelect,
   onEnemySelect,
 }: MapToolbarProps) {
+  const {
+    serverEditDraft,
+    serverEditInvalid,
+    isEditingServerId,
+    setServerEditDraft,
+    setServerEditInvalid,
+    setIsEditingServerId,
+  } = useMapToolbarServerControls(activeServerId);
+
   const [isAddingServer, setIsAddingServer] = useState(false);
-  const [isEditingServerId, setIsEditingServerId] = useState(false);
   const [serverDraft, setServerDraft] = useState("");
   const [serverDraftInvalid, setServerDraftInvalid] = useState(false);
-  const [serverEditDraft, setServerEditDraft] = useState(activeServerId);
-  const [serverEditInvalid, setServerEditInvalid] = useState(false);
-
-  useEffect(() => {
-    setServerEditDraft(activeServerId);
-    setServerEditInvalid(false);
-    setIsEditingServerId(false);
-  }, [activeServerId]);
 
   function submitServer() {
     const nextServerId = serverDraft.trim();

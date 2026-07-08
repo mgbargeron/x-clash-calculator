@@ -1,4 +1,5 @@
 import {useEffect, useRef, useState} from "react";
+import {useEscapeClose} from "../../hooks/useEscapeClose";
 
 import {
   createPlannerEvent,
@@ -65,16 +66,7 @@ export default function EventPlannerDialog({
     );
   }, [open, event, slot, plannerState]);
 
-  useEffect(() => {
-    if (!open) return;
-
-    const onKeyDown = (keyEvent: KeyboardEvent) => {
-      if (keyEvent.key === "Escape") onClose();
-    };
-
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [open, onClose]);
+  useEscapeClose(open, onClose);
 
   if (!open || !draft) return null;
   const currentDraft = draft;

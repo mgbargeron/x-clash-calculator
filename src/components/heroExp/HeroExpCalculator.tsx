@@ -1,10 +1,12 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useMemo, useRef } from "react";
 import Decimal from "decimal.js";
 import type { Row } from "../../types";
 import { sanitizeNumericInput } from "../../utils/sanitizeNumericInput";
 import { toDecimal } from "../../utils/toDecimal";
 import { useLocalStorage } from "../../hooks/useLocalStorage";
 import { useInitialRowsSync } from "../../hooks/useInitialRowsSync";
+import { useLevelScrollSync } from "../../hooks/useLevelScrollSync";
+import { useStartLevelClamp, useDesiredLevelClamp } from "../../hooks/useLevelClamp";
 import { HeroExpChestValues } from "./HeroExpChestValues";
 import { HeroExpOverview } from "./HeroExpOverview";
 import { HeroExpInputGrid } from "./HeroExpInputGrid";
@@ -212,7 +214,6 @@ export default function HeroExpCalculator({
 }: HeroExpCalculatorProps) {
   const levelListRef = useRef<HTMLDivElement | null>(null);
   const currentLevelRef = useRef<HTMLDivElement | null>(null);
-  const isMounted = useRef(true);
 
   const initialRows = useMemo<Row[]>(
     () => [
@@ -228,23 +229,8 @@ export default function HeroExpCalculator({
   const [startLevel, setStartLevel] = useLocalStorage<number>(`${storageKey}${START_LEVEL_STORAGE_SUFFIX}`, 1);
   const [desiredLevel, setDesiredLevel] = useLocalStorage<number>(`${storageKey}${DESIRED_LEVEL_STORAGE_SUFFIX}`, MAX_HERO_LEVEL);
 
-  useEffect(() => {
-    if (!Number.isFinite(startLevel)) {
-      setStartLevel(clampLevel(1));
-    } else if (startLevel < 1 || startLevel > MAX_HERO_LEVEL) {
-      setStartLevel(clampLevel(startLevel));
-    }
-  }, [startLevel, setStartLevel]);
-
-  useEffect(() => {
-    if (!Number.isFinite(desiredLevel)) {
-      setDesiredLevel(clampLevel(MAX_HERO_LEVEL));
-    } else if (desiredLevel < 1 || desiredLevel > MAX_HERO_LEVEL) {
-      setDesiredLevel(clampLevel(desiredLevel));
-    } else if (desiredLevel < startLevel) {
-      setDesiredLevel(startLevel);
-    }
-  }, [desiredLevel, setDesiredLevel, startLevel]);
+  useStartLevelClamp(startLevel, setStartLevel);
+  useDesiredLevelClamp(desiredLevel, setDesiredLevel, startLevel);
 
   const rowTotals = useMemo(
     () =>
@@ -309,18 +295,11 @@ export default function HeroExpCalculator({
     };
   }, [startLevel, desiredLevel, totalExp]);
 
-  useEffect(() => {
-    if (!isMounted.current) return;
-    const listElement = levelListRef.current;
-    const targetElement = currentLevelRef.current;
-    if (!listElement || !targetElement) return;
-
-    const listRect = listElement.getBoundingClientRect();
-    const targetRect = targetElement.getBoundingClientRect();
-    const relativeTop = targetRect.top - listRect.top;
-
-    listElement.scrollTo({ top: listElement.scrollTop + relativeTop, behavior: "smooth" });
-  }, [progression.achievedLevel]);
+  useLevelScrollSync(
+    progression.achievedLevel,
+    levelListRef,
+    currentLevelRef
+  );
 
   const chestRequirements = useMemo(
     () =>
