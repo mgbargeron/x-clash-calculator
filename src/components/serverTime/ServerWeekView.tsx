@@ -159,7 +159,7 @@ function DayCell({slot, isExpanded, selectedTimezones, onSelectSlot, onEditEvent
   const filteredEvents = slot.matchingEvents.filter((event) => !event.skippedDates.includes(slot.serverDate));
   const hasEvent = filteredEvents.length > 0;
 
-  return hasEvent ? (
+  return (
     <div
       className={`server-week-cell ${slot.isCurrentHour ? "current" : ""} ${hasEvent ? "has-event" : ""}`}
       title={`${formatServerDay(slot.serverDayOfWeek)} ${slot.serverLabel} -> ${formatLocalDateTime(slot.localDate)}`}
@@ -247,13 +247,9 @@ function DayCell({slot, isExpanded, selectedTimezones, onSelectSlot, onEditEvent
             ))}
           </div>
         </details>
-      ) : (
-        <div className="server-week-events server-week-events--empty">
-          <span>No events</span>
-        </div>
-      )}
+      ) : null}
     </div>
-  ) : null;
+  );
 }
 
 function shortTimezoneLabel(timezone: string): string {

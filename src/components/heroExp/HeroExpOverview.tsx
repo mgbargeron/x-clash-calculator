@@ -1,6 +1,7 @@
-import { useState, useRef, useMemo, useEffect, useCallback } from "react";
+import { useState, useRef, useMemo, useCallback } from "react";
 import Decimal from "decimal.js";
 import { formatWholeDecimal } from "../../utils/formatWholeDecimal";
+import { useLevelInputSync } from "../../hooks/useLevelInputSync";
 
 const MAX_VISIBLE_OPTIONS = 10;
 
@@ -23,9 +24,7 @@ function LevelAutocomplete({
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
 
-  useEffect(() => {
-    setInputValue(String(value));
-  }, [value]);
+  useLevelInputSync(value, setInputValue);
 
   const filteredOptions = useMemo(() => {
     if (!inputValue) return LEVEL_OPTIONS;

@@ -21,6 +21,8 @@ import { useSeasonPersistence } from "../hooks/useSeasonPersistence";
 import { useDeselectTileOnOutsideClick } from "../hooks/useDeselectTileOnOutsideClick";
 import { useUndoKeyboardShortcut } from "../hooks/useUndoKeyboardShortcut";
 import { useBeforeUnloadSave } from "../hooks/useBeforeUnloadSave";
+import { useMapStoreRefSync } from "../hooks/useMapStoreRefSync";
+import { useMapStoreSaver } from "../hooks/useMapStoreSaver";
 import { getSeasonConfig } from "../utils/gameMapConfig";
 import type { Season, GameMapConfig } from "../utils/gameMapConfig";
 
@@ -527,15 +529,9 @@ export default function GameMapPage({ navigation }: GameMapPageProps) {
     };
   }, [firstTileId, mapConfig, activeSeason]);
 
-  useEffect(() => {
-    latestStoreRef.current = mapStore;
-    latestSnapshotRef.current = activeServerSnapshot;
-  }, [activeServerSnapshot, mapStore]);
+  useMapStoreRefSync(latestStoreRef, latestSnapshotRef, mapStore, activeServerSnapshot);
 
-  useEffect(() => {
-    if (!hasLoadedStoredMap.current) return;
-    void saveStoredMapStore(mapStore, activeSeason);
-  }, [mapStore, activeSeason]);
+  useMapStoreSaver(mapStore, activeSeason);
 
   const flushLatestState = useEffectEvent(() => {
     if (!hasLoadedStoredMap.current) return;

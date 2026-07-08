@@ -1,10 +1,12 @@
-import {useEffect, useMemo, useRef, useState, type ReactNode} from "react";
+import {useMemo, useRef, useState, type ReactNode} from "react";
 
 import EventPlannerDialog from "../components/serverTime/EventPlannerDialog";
 import ServerWeekView from "../components/serverTime/ServerWeekView";
 import {useServerTimeDataLoader} from "../hooks/useServerTimeDataLoader";
 import {useServerTimeDataSaver} from "../hooks/useServerTimeDataSaver";
 import {useNowRefresher} from "../hooks/useNowRefresher";
+import {usePlannerAlternatingWeekSync} from "../hooks/usePlannerAlternatingWeekSync";
+import {useAlarmNotification} from "../hooks/useAlarmNotification";
 import {
   type AlternatingWeek,
   CURATED_TIMEZONES,
@@ -50,29 +52,7 @@ export default function ServerTimePage({navigation}: ServerTimePageProps) {
   );
   const lastNotifiedAlarmRef = useRef<string | null>(null);
 
-  useEffect(() => {
-    if (!isLoaded) return;
-
-    setPlannerState((current) => {
-      const alternatingWeekState = getResolvedAlternatingWeekState(current, now);
-      const existing = current.alternatingWeekState;
-
-      if (
-        existing?.anchorServerDate === alternatingWeekState?.anchorServerDate &&
-        existing?.anchorWeek === alternatingWeekState?.anchorWeek &&
-        existing?.lastResolvedServerDate === alternatingWeekState?.lastResolvedServerDate &&
-        existing?.currentWeek === alternatingWeekState?.currentWeek
-      ) {
-        return current;
-      }
-
-      return {
-        ...current,
-        alternatingWeekState,
-      };
-    });
-  }, [isLoaded, now]);
-
+  usePlannerAlternatingWeekSync(isLoaded, now, plannerState, setPlannerState);
   useServerTimeDataSaver(plannerState, isLoaded);
 
   const localTimezone = useMemo(
@@ -132,23 +112,7 @@ export default function ServerTimePage({navigation}: ServerTimePageProps) {
     return candidates[0] ?? null;
   }, [eventRows, now, plannerState.acknowledgedAlarmKeys, plannerState.settings.alarmsMuted]);
 
-  useEffect(() => {
-    if (!upcomingAlarm) return;
-    if (lastNotifiedAlarmRef.current === upcomingAlarm.alarmKey) return;
-
-    lastNotifiedAlarmRef.current = upcomingAlarm.alarmKey;
-    playAlarmChime();
-
-    if (typeof Notification !== "undefined" && Notification.permission === "granted") {
-      try {
-        new Notification("Server event coming up", {
-          body: `${upcomingAlarm.event.name || "Unnamed event"} starts at ${formatLocalDateTime(upcomingAlarm.occurrence)}.`,
-        });
-      } catch {
-        // Ignore Notification API issues.
-      }
-    }
-  }, [upcomingAlarm]);
+  useAlarmNotification(upcomingAlarm, lastNotifiedAlarmRef);
 
   async function enableAlarmNotifications() {
     if (typeof Notification === "undefined") {
@@ -585,39 +549,6 @@ export default function ServerTimePage({navigation}: ServerTimePageProps) {
       />
     </section>
   );
-}
-
-function playAlarmChime() {
-  if (typeof window === "undefined") return;
-
-  const AudioContextCtor =
-    window.AudioContext ||
-    (window as Window & typeof globalThis & {webkitAudioContext?: typeof AudioContext}).webkitAudioContext;
-
-  if (!AudioContextCtor) return;
-
-  try {
-    const audioContext = new AudioContextCtor();
-    const oscillator = audioContext.createOscillator();
-    const gainNode = audioContext.createGain();
-
-    oscillator.type = "triangle";
-    oscillator.frequency.setValueAtTime(880, audioContext.currentTime);
-    gainNode.gain.setValueAtTime(0.0001, audioContext.currentTime);
-    gainNode.gain.exponentialRampToValueAtTime(0.08, audioContext.currentTime + 0.02);
-    gainNode.gain.exponentialRampToValueAtTime(0.0001, audioContext.currentTime + 0.45);
-
-    oscillator.connect(gainNode);
-    gainNode.connect(audioContext.destination);
-
-    oscillator.start();
-    oscillator.stop(audioContext.currentTime + 0.45);
-    oscillator.onended = () => {
-      void audioContext.close();
-    };
-  } catch {
-    // Ignore audio API issues.
-  }
 }
 
 function ensureAlternatingDefaults(

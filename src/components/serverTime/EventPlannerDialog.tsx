@@ -1,7 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 
 import {
-  createPlannerEvent,
   formatLocalDateTime,
   formatServerDay,
   sanitizeDateInput,
@@ -10,6 +9,8 @@ import {
   type ServerTimePlannerState,
   type ServerWeekHour,
 } from "../../utils/serverTime";
+import { useEscapeClose } from "../../hooks/useEscapeClose";
+import { useDialogDraftSync } from "../../hooks/useDialogDraftSync";
 
 type TimeOption = { value: string; label: string };
 
@@ -38,66 +39,9 @@ export default function EventPlannerDialog({
 }: EventPlannerDialogProps) {
   const [draft, setDraft] = useState<PlannerEvent | null>(null);
   const [skipChecked, setSkipChecked] = useState(false);
-  const prevOpenRef = useRef(open);
-  const prevEventRef = useRef(editingEvent);
-  const prevSlotRef = useRef(slot);
 
-  useEffect(() => {
-    if (prevOpenRef.current === open) return;
-    prevOpenRef.current = open;
-
-    if (!open) {
-      setDraft(null);
-      return;
-    }
-
-    prevEventRef.current = editingEvent;
-    prevSlotRef.current = slot;
-
-    const newDraft = buildDraft(editingEvent, slot, plannerState);
-    if (newDraft) {
-      setDraft(newDraft);
-      if (slot && newDraft.type !== "oneTime") {
-        setSkipChecked(newDraft.skippedDates.includes(slot.serverDate));
-      }
-    }
-  }, [open, editingEvent, slot, plannerState]);
-
-  useEffect(() => {
-    if (!open) return;
-
-    const onKeyDown = (keyEvent: KeyboardEvent) => {
-      if (keyEvent.key === "Escape") onClose();
-    };
-
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [open, onClose]);
-
-  function buildDraft(event: PlannerEvent | null, slot: ServerWeekHour | null, state: ServerTimePlannerState): PlannerEvent | null {
-    if (!open) return null;
-
-    if (event) {
-      return {
-        ...event,
-        alarmEnabled: false,
-      };
-    }
-
-    if (slot) {
-      return createPlannerEvent(state.settings.defaultAlarmLeadMinutes, {
-        type: "oneTime",
-        serverDayOfWeek: slot.serverDayOfWeek,
-        serverTime: slot.serverLabel,
-        oneTimeServerDate: slot.serverDate,
-        alternatingWeek: state.alternatingWeekState?.currentWeek ?? "A",
-        alternatingAnchorDate: slot.serverDate,
-        alarmEnabled: false,
-      });
-    }
-
-    return createPlannerEvent(state.settings.defaultAlarmLeadMinutes);
-  }
+  useEscapeClose(open, onClose);
+  useDialogDraftSync(open, editingEvent, slot, plannerState, setDraft, setSkipChecked);
 
   if (!open || !draft) return null;
   const currentDraft = draft;
