@@ -148,8 +148,6 @@ function DayCell({slot, isExpanded, selectedTimezones, onSelectSlot, onRemoveEve
         className="server-week-slot-button"
         type="button"
         onClick={() => onSelectSlot(slot)}
-        disabled
-        title="Event planning is temporarily disabled."
       >
         <div className="server-week-cell-top">
           <strong>Server Time {slot.serverLabel}</strong>

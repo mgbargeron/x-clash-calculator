@@ -1,5 +1,4 @@
-import {useEffect, useRef, useState} from "react";
-import {useEscapeClose} from "../../hooks/useEscapeClose";
+import { useEffect, useRef, useState } from "react";
 
 import {
   createPlannerEvent,
@@ -24,54 +23,74 @@ type EventPlannerDialogProps = {
 export default function EventPlannerDialog({
   open,
   slot,
-  event,
+  event: editingEvent,
   plannerState,
   onClose,
   onSave,
 }: EventPlannerDialogProps) {
   const [draft, setDraft] = useState<PlannerEvent | null>(null);
   const prevOpenRef = useRef(open);
+  const prevEventRef = useRef(editingEvent);
+  const prevSlotRef = useRef(slot);
 
   useEffect(() => {
-    if (!open || prevOpenRef.current) return;
+    if (prevOpenRef.current === open) return;
     prevOpenRef.current = open;
 
+    if (!open) {
+      setDraft(null);
+      return;
+    }
+
+    prevEventRef.current = editingEvent;
+    prevSlotRef.current = slot;
+
+    const newDraft = buildDraft(editingEvent, slot, plannerState);
+    if (newDraft) {
+      setDraft(newDraft);
+    }
+  }, [open, editingEvent, slot, plannerState]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    const onKeyDown = (keyEvent: KeyboardEvent) => {
+      if (keyEvent.key === "Escape") onClose();
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [open, onClose]);
+
+  function buildDraft(event: PlannerEvent | null, slot: ServerWeekHour | null, state: ServerTimePlannerState): PlannerEvent | null {
+    if (!open || (!event && !slot)) return null;
+
     if (event) {
-      setDraft({
+      return {
         ...event,
         alarmEnabled: false,
-      });
-      return;
+      };
     }
 
     if (slot) {
-      setDraft(
-        createPlannerEvent(plannerState.settings.defaultAlarmLeadMinutes, {
-          type: "oneTime",
-          serverDayOfWeek: slot.serverDayOfWeek,
-          serverTime: `${String(slot.serverHour).padStart(2, "0")}:00`,
-          oneTimeServerDate: slot.serverDate,
-          alternatingWeek: plannerState.alternatingWeekState?.currentWeek ?? "A",
-          alternatingAnchorDate: slot.serverDate,
-          alarmEnabled: false,
-        })
-      );
-      return;
+      return createPlannerEvent(state.settings.defaultAlarmLeadMinutes, {
+        type: "oneTime",
+        serverDayOfWeek: slot.serverDayOfWeek,
+        serverTime: `${String(slot.serverHour).padStart(2, "0")}:00`,
+        oneTimeServerDate: slot.serverDate,
+        alternatingWeek: state.alternatingWeekState?.currentWeek ?? "A",
+        alternatingAnchorDate: slot.serverDate,
+        alarmEnabled: false,
+      });
     }
 
-    setDraft(
-      createPlannerEvent(plannerState.settings.defaultAlarmLeadMinutes, {
-        alternatingWeek: plannerState.alternatingWeekState?.currentWeek ?? "A",
-      })
-    );
-  }, [open, event, slot, plannerState]);
-
-  useEscapeClose(open, onClose);
+    return null;
+  }
 
   if (!open || !draft) return null;
   const currentDraft = draft;
 
-  const title = event ? "Edit Event" : `Plan Event For ${formatServerDay(currentDraft.serverDayOfWeek)} ${currentDraft.serverTime}`;
+  const title = editingEvent ? "Edit Event" : `Plan Event For ${formatServerDay(currentDraft.serverDayOfWeek)} ${currentDraft.serverTime}`;
   const slotSummary = slot
     ? `Server ${formatServerDay(slot.serverDayOfWeek)} ${slot.serverLabel} · ${slot.serverDate}`
     : currentDraft.type === "oneTime" && currentDraft.oneTimeServerDate
