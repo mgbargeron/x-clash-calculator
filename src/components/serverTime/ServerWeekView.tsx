@@ -1,4 +1,4 @@
-import {useState} from "react";
+import {useEffect, useState} from "react";
 
 import {
   buildServerWeekHours,
@@ -43,6 +43,7 @@ export default function ServerWeekView({
     Object.fromEntries(Array.from({length: 7}, (_, index) => [index, false]))
   );
   const [expandedEventSlots, setExpandedEventSlots] = useState<Record<string, boolean>>({});
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const isEventVisible = (event: PlannerEvent, serverDate: string): boolean =>
     !event.skippedDates.includes(serverDate);
 
@@ -59,16 +60,37 @@ export default function ServerWeekView({
   ).map((slot) => slot.key);
   const allEventsExpanded = eventSlotKeys.length > 0 && eventSlotKeys.every((key) => expandedEventSlots[key]);
 
+  useEffect(() => {
+    if (!isFullscreen) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsFullscreen(false);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isFullscreen]);
+
   return (
-    <section className="server-time-panel">
+    <section className={`server-time-panel server-week-panel ${isFullscreen ? "fullscreen" : ""}`}>
       <div className="server-time-panel-header">
         <div>
           <h2>Server Week</h2>
-          <small>Sunday through Saturday, with every server hour mapped to local time.</small>
+          <small>Every server hour mapped to local time.</small>
         </div>
         <div className="server-time-panel-actions">
           <button
-            className="secondary-button"
+            className="secondary-button server-week-fullscreen-toggle"
+            type="button"
+            onClick={() => setIsFullscreen((current) => !current)}
+            aria-pressed={isFullscreen}
+          >
+            {isFullscreen ? "Exit Full Screen" : "Full Screen"}
+          </button>
+          <button
+            className="secondary-button server-week-event-expand-toggle"
             type="button"
             onClick={() =>
               setExpandedEventSlots(
@@ -106,8 +128,7 @@ export default function ServerWeekView({
                     <span className="server-week-day-toggle-icon" aria-hidden="true">▾</span>
                   </button>
                 </div>
-                <small>{header.localDateLabel}</small>
-                <small>{header.visibleSlots} visible</small>
+                <small>{header.localDateLabel} · {header.visibleSlots} visible</small>
               </div>
               <div className="server-week-day-scroll">
                 {(showAllByDay[header.dayIndex]
@@ -170,8 +191,14 @@ function DayCell({slot, isExpanded, selectedTimezones, onSelectSlot, onEditEvent
         onClick={() => onSelectSlot(slot)}
       >
         <div className="server-week-cell-top">
-          <strong>Server Time {slot.serverLabel}</strong>
-          <span>{slot.localLabel}</span>
+          <span className="server-week-server-time">
+            <span>Server</span>
+            <strong>{slot.serverLabel}</strong>
+          </span>
+          <span className="server-week-local-time">
+            <span>Local</span>
+            <strong>{slot.localLabel}</strong>
+          </span>
         </div>
         {selectedTimezones.length > 0 ? (
           <div className="server-week-timezones">
@@ -198,10 +225,13 @@ function DayCell({slot, isExpanded, selectedTimezones, onSelectSlot, onEditEvent
             {filteredEvents.map((event) => (
               <div className="server-week-event-row" key={event.id}>
                 <div className="server-week-event-row-header">
-                  <strong>{event.name || "Unnamed event"}</strong>
+                  <div className="server-week-event-title">
+                    <strong>{event.name || "Unnamed event"}</strong>
+                    <span>{event.serverTime}</span>
+                  </div>
                   <div className="event-row-actions">
                     <button
-                      className="secondary-button event-edit-btn"
+                      className="event-edit-btn"
                       type="button"
                       onClick={(clickEvent) => {
                         clickEvent.preventDefault();
@@ -242,7 +272,6 @@ function DayCell({slot, isExpanded, selectedTimezones, onSelectSlot, onEditEvent
                     </button>
                   </div>
                 </div>
-                <span>{event.serverTime}</span>
               </div>
             ))}
           </div>
