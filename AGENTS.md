@@ -53,5 +53,10 @@ Electron 41 + React 19 + Vite 8 + TypeScript (strict). Single package, no monore
 - Do not rely on TypeScript types alone for persisted or external data; normalize and validate shape and primitive types before calling string/array/object methods.
 - Prefer small defensive coercions at utility/component boundaries when malformed runtime data would otherwise blank the renderer or break packaged builds.
 
+### Large file writes
+- For any file over ~80 lines, use `bash` with `cat << 'EOF' > filepath` to write it — NOT the `write` tool. The `write` tool serializes file content as an escaped JSON string, and large payloads (~400+ lines of TypeScript data) exceed parsing limits and fail with "invalid tool" errors.
+- If a `write` or `edit` tool call fails, do NOT retry it with the same approach. Switch immediately to `bash` + heredoc.
+- When creating new split-data files (`gameMapSeason1.ts`, `gameMapSeason2.ts`, etc.), extract the data section into a temp file via bash first if the content exceeds 100 lines.
+
 ## Vite quirks
 - `base` is set to `'./'` (relative paths) so the built app works from the Electron file:// protocol.

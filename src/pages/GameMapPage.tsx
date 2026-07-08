@@ -17,11 +17,12 @@ import type {
   TileMarker,
 } from "../components/gameMap/types";
 import { usePointSummaries } from "../hooks/usePointSummaries";
-import { defaultGameMapConfig } from "../utils/gameMapConfig";
-import type { GameMapConfig } from "../utils/gameMapConfig";
+import { getSeasonConfig } from "../utils/gameMapConfig";
+import type { Season, GameMapConfig } from "../utils/gameMapConfig";
 
 const MAP_STORAGE_KEY = "game-map-v2";
 const LEGACY_MAP_STORAGE_KEY = "game-map-v1";
+const SEASON_STORAGE_KEY = "game-map-season";
 const DEFAULT_SERVER_ID = "001";
 const MAX_ACTION_HISTORY = 10;
 const MIN_MAP_ZOOM = 0.75;
@@ -58,6 +59,10 @@ type StoredTile = {
   enemyTeamId?: unknown;
   note?: unknown;
 };
+
+function createSeasonStorageKey(season: Season): string {
+  return `${MAP_STORAGE_KEY}-s${season}`;
+}
 
 function createStableId(prefix: string): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -347,7 +352,8 @@ function normalizeStoredMapStore(
 
 async function loadStoredMapStore(
   mapConfig: GameMapConfig,
-  firstTileId: string
+  firstTileId: string,
+  season: Season
 ): Promise<MultiServerMapStore> {
   let raw: unknown = null;
 
@@ -360,8 +366,9 @@ async function loadStoredMapStore(
   }
 
   if (!raw) {
+    const seasonKey = createSeasonStorageKey(season);
     try {
-      raw = JSON.parse(localStorage.getItem(MAP_STORAGE_KEY) ?? "null");
+      raw = JSON.parse(localStorage.getItem(seasonKey) ?? "null");
     } catch {
       raw = null;
     }
@@ -386,8 +393,9 @@ async function loadStoredMapStore(
   return createDefaultMapStore(mapConfig, firstTileId);
 }
 
-async function saveStoredMapStore(store: MultiServerMapStore) {
-  localStorage.setItem(MAP_STORAGE_KEY, JSON.stringify(store));
+async function saveStoredMapStore(store: MultiServerMapStore, season: Season) {
+  const seasonKey = createSeasonStorageKey(season);
+  localStorage.setItem(seasonKey, JSON.stringify(store));
 
   if (window.electronAPI.setMapData) {
     try {
@@ -414,8 +422,27 @@ function replaceActiveServerSnapshot(
 type GameMapPageProps = { navigation: ReactNode };
 
 export default function GameMapPage({ navigation }: GameMapPageProps) {
-  const mapConfig = defaultGameMapConfig;
+  const [activeSeason, setActiveSeason] = useState<Season>(() => {
+    try {
+      const stored = localStorage.getItem(SEASON_STORAGE_KEY);
+      const parsed = Number(stored);
+      return parsed === 1 || parsed === 2 ? parsed : 1;
+    } catch {
+      return 1;
+    }
+  });
+
+  const mapConfig = getSeasonConfig(activeSeason);
   const firstTileId = mapConfig.tiles[0]?.id ?? "";
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(SEASON_STORAGE_KEY, String(activeSeason));
+    } catch {
+      // Ignore storage errors.
+    }
+  }, [activeSeason]);
+
   const boardRef = useRef<HTMLDivElement | null>(null);
   const hasLoadedStoredMap = useRef(false);
   const [mapStore, setMapStore] = useState<MultiServerMapStore>(() =>
@@ -497,7 +524,7 @@ export default function GameMapPage({ navigation }: GameMapPageProps) {
   useEffect(() => {
     let cancelled = false;
 
-    void loadStoredMapStore(mapConfig, firstTileId).then((storedMapStore) => {
+    void loadStoredMapStore(mapConfig, firstTileId, activeSeason).then((storedMapStore) => {
       if (cancelled) return;
 
       applyMapStore(storedMapStore);
@@ -508,7 +535,7 @@ export default function GameMapPage({ navigation }: GameMapPageProps) {
     return () => {
       cancelled = true;
     };
-  }, [firstTileId, mapConfig]);
+  }, [firstTileId, mapConfig, activeSeason]);
 
   useEffect(() => {
     latestStoreRef.current = mapStore;
@@ -517,12 +544,12 @@ export default function GameMapPage({ navigation }: GameMapPageProps) {
 
   useEffect(() => {
     if (!hasLoadedStoredMap.current) return;
-    void saveStoredMapStore(mapStore);
-  }, [mapStore]);
+    void saveStoredMapStore(mapStore, activeSeason);
+  }, [mapStore, activeSeason]);
 
   const flushLatestState = useEffectEvent(() => {
     if (!hasLoadedStoredMap.current) return;
-    void saveStoredMapStore(latestStoreRef.current);
+    void saveStoredMapStore(latestStoreRef.current, activeSeason);
   });
 
   useEffect(() => {
@@ -885,7 +912,21 @@ export default function GameMapPage({ navigation }: GameMapPageProps) {
           <p className="eyebrow">Planning board</p>
           <h1>Game Map</h1>
         </div>
-        {navigation}
+        <div className="page-header-controls">
+          {navigation}
+          <button
+            className={`season-toggle-button ${activeSeason === 2 ? "season-2-active" : ""}`}
+            type="button"
+            onClick={() => {
+              const nextSeason = activeSeason === 2 ? 1 : 2;
+              setActiveSeason(nextSeason);
+            }}
+            title={`Switch to Season ${activeSeason === 2 ? "1" : "2"}`}
+            aria-label="Switch season"
+          >
+            {activeSeason === 2 ? "S2" : "S1"}
+          </button>
+        </div>
       </div>
       <p style={{ margin: 0, fontSize: "0.8rem", color: "#8a9bc0" }}>
         {activeServerLabel}. Click a tile to select it, then use the toolbar to paint markers.
