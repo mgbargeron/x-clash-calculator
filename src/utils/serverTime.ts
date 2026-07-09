@@ -18,6 +18,7 @@ export type PlannerEvent = {
   hasCrew: boolean;
   crewRoster: string[];
   crewAssignmentOverrides: Record<string, string>;
+  startDate: string;
 };
 
 export type AlternatingWeekState = {
@@ -90,6 +91,7 @@ export const DEFAULT_SERVER_TIME_STATE: ServerTimePlannerState = {
       alarmEnabled: true,
       alarmLeadMinutes: 15,
       skippedDates: [],
+      startDate: "",
       hasCrew: false,
       crewRoster: [],
       crewAssignmentOverrides: {},
@@ -108,6 +110,7 @@ export const DEFAULT_SERVER_TIME_STATE: ServerTimePlannerState = {
       alarmEnabled: false,
       alarmLeadMinutes: 30,
       skippedDates: [],
+      startDate: "",
       hasCrew: false,
       crewRoster: [],
       crewAssignmentOverrides: {},
@@ -155,6 +158,7 @@ const baseEvent: PlannerEvent = {
     alarmEnabled: false,
     alarmLeadMinutes: defaultLeadMinutes,
     skippedDates: [],
+    startDate: "",
     hasCrew: false,
     crewRoster: [],
     crewAssignmentOverrides: {},
@@ -338,12 +342,17 @@ export function getDriverForDate(
     return { driver: roster[0], isOverride: false };
   }
 
-  const date = parseDateInput(serverDate);
-  if (!date) return { driver: roster[0], isOverride: false };
+  const targetDate = parseDateInput(serverDate);
+  if (!targetDate) return { driver: roster[0], isOverride: false };
 
-  const epoch = new Date(0);
-  const dayIndex = Math.floor((date.getTime() - epoch.getTime()) / DAY_MS);
-  const driverIndex = dayIndex % roster.length;
+  // Use startDate as the rotation anchor, fallback to epoch if not set
+  const anchorInput = event.startDate || "";
+  const anchorDate = anchorInput ? parseDateInput(anchorInput) : null;
+
+  const anchor = anchorDate || new Date(0);
+  const daysDiff = Math.floor((targetDate.getTime() - anchor.getTime()) / DAY_MS);
+  const adjustedDays = daysDiff >= 0 ? daysDiff : -daysDiff;
+  const driverIndex = adjustedDays % roster.length;
 
   return { driver: roster[driverIndex], isOverride: false };
 }
@@ -559,6 +568,7 @@ function normalizeEvent(raw: unknown, index: number, fallbackLeadMinutes: number
           return acc;
         }, {}))
       : {},
+    startDate: sanitizeDateInput(typeof event.startDate === "string" ? event.startDate : ""),
   };
 }
 

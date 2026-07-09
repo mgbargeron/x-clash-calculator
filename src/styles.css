@@ -2632,6 +2632,31 @@ h1 {
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 8px;
   padding: 4px 6px;
+  cursor: grab;
+  user-select: none;
+  transition: opacity 0.2s, transform 0.2s;
+}
+
+.crew-roster-item.dragging {
+  opacity: 0.5;
+  transform: scale(0.95);
+}
+
+.crew-roster-item.drag-over {
+  border-color: rgba(109, 140, 255, 0.6);
+  background: rgba(109, 140, 255, 0.1);
+}
+
+.crew-roster-drag-handle {
+  font-size: 0.75rem;
+  color: #8a94b6;
+  cursor: grab;
+  padding: 0 2px;
+  line-height: 1;
+}
+
+.crew-roster-drag-handle:active {
+  cursor: grabbing;
 }
 
 .crew-roster-item span {

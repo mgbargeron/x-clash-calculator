@@ -40,6 +40,7 @@ export default function EventPlannerDialog({
   const [draft, setDraft] = useState<PlannerEvent | null>(null);
   const [skipChecked, setSkipChecked] = useState(false);
   const [newCrewMember, setNewCrewMember] = useState("");
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
 
   useEscapeClose(open, onClose);
   useDialogDraftSync(open, editingEvent, slot, plannerState, setDraft, setSkipChecked);
@@ -108,6 +109,35 @@ export default function EventPlannerDialog({
           }
         : current
     );
+  }
+
+  function onDragStart(index: number) {
+    setDraggedIndex(index);
+  }
+
+  function onDragOver(index: number) {
+    if (draft && draggedIndex !== null && draggedIndex !== index) {
+      setDraft((current) =>
+        current
+          ? {
+              ...current,
+              crewRoster: reorderArray(current.crewRoster, draggedIndex, index),
+            }
+          : current
+      );
+      setDraggedIndex(index);
+    }
+  }
+
+  function onDragEnd() {
+    setDraggedIndex(null);
+  }
+
+  function reorderArray<T>(array: T[], from: number, to: number): T[] {
+    const result = Array.from(array);
+    const [item] = result.splice(from, 1);
+    result.splice(to, 0, item);
+    return result;
   }
 
   return (
@@ -227,6 +257,23 @@ export default function EventPlannerDialog({
               </label>
             ) : null}
 
+            {isRecurringEvent ? (
+              <label className="server-time-field">
+                <span>Start Date</span>
+                <input
+                  className="cell-input"
+                  type="date"
+                  value={currentDraft.startDate}
+                  onChange={(inputEvent) =>
+                    updateDraft((current) => ({
+                      ...current,
+                      startDate: sanitizeDateInput(inputEvent.target.value),
+                    }))
+                  }
+                />
+              </label>
+            ) : null}
+
           </div>
 
           <label className="server-time-field">
@@ -264,8 +311,19 @@ export default function EventPlannerDialog({
             {currentDraft.hasCrew ? (
               <>
                 <div className="crew-roster-list">
-                  {currentDraft.crewRoster.map((member) => (
-                    <div className="crew-roster-item" key={member}>
+                  {currentDraft.crewRoster.map((member, index) => (
+                    <div
+                      className={`crew-roster-item ${draggedIndex === index ? "dragging" : ""}`}
+                      key={`${member}-${index}`}
+                      draggable
+                      onDragStart={() => onDragStart(index)}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        onDragOver(index);
+                      }}
+                      onDragEnd={onDragEnd}
+                    >
+                      <span className="crew-roster-drag-handle">⠿</span>
                       <span>{member}</span>
                       <button
                         type="button"
