@@ -2604,3 +2604,93 @@ h1 {
         max-height: none;
     }
 }
+
+/* Crew Roster & Driver Assignment */
+.crew-section {
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius);
+  padding: var(--spacing-sm);
+  margin-top: var(--spacing-md);
+}
+
+.crew-section .server-time-toggle span {
+  font-weight: 600;
+}
+
+.crew-roster-list {
+  margin-top: var(--spacing-xs);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs);
+}
+
+.crew-roster-item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius);
+  padding: var(--spacing-xs) var(--spacing-sm);
+}
+
+.crew-roster-item span {
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+.crew-remove-btn {
+  width: 1.4em;
+  height: 1.4em;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.crew-add-row {
+  display: flex;
+  gap: var(--spacing-xs);
+  margin-top: var(--spacing-xs);
+}
+
+.crew-add-row .cell-input {
+  flex: 1;
+}
+
+/* Weekly view crew dropdown */
+.server-week-crew-row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  margin-top: var(--spacing-xs);
+  padding-top: var(--spacing-xs);
+  border-top: 1px solid var(--color-border-light);
+}
+
+.crew-label {
+  font-size: 0.75rem;
+  color: var(--color-muted);
+  white-space: nowrap;
+}
+
+.crew-driver-select {
+  padding: 2px 4px;
+  font-size: 0.8rem;
+  min-width: 80px;
+}
+
+/* Event card crew badge */
+.event-card-stat-label {
+  display: block;
+  margin-top: var(--spacing-xs);
+  font-size: 0.8rem;
+  color: var(--color-muted);
+}
+
+.crew-badge {
+  color: var(--color-primary);
+  font-weight: 500;
+}

@@ -7,6 +7,7 @@ import {
   type PlannerEvent,
   type ServerTimeSettings,
   type ServerWeekHour,
+  getDriverForDate,
 } from "../../utils/serverTime";
 
 type ServerWeekViewProps = {
@@ -19,6 +20,7 @@ type ServerWeekViewProps = {
   onEditEvent: (eventId: string) => void;
   onRemoveEvent: (eventId: string) => void;
   onToggleSkipSlot: (eventId: string, serverDate: string) => void;
+  onAssignDriver: (eventId: string, serverDate: string, driver: string) => void;
 };
 
 export default function ServerWeekView({
@@ -31,6 +33,7 @@ export default function ServerWeekView({
   onEditEvent,
   onRemoveEvent,
   onToggleSkipSlot,
+  onAssignDriver,
 }: ServerWeekViewProps) {
   const weekHours = buildServerWeekHours(
     weekStart,
@@ -154,6 +157,7 @@ export default function ServerWeekView({
                         [slot.key]: nextOpen,
                       }))
                     }
+                    onAssignDriver={onAssignDriver}
                   />
                 ))}
               </div>
@@ -173,10 +177,11 @@ type DayCellProps = {
   onEditEvent: (eventId: string) => void;
   onRemoveEvent: (eventId: string) => void;
   onToggleSkipSlot: (eventId: string, serverDate: string) => void;
+  onAssignDriver: (eventId: string, serverDate: string, driver: string) => void;
   onToggleExpanded: (nextOpen: boolean) => void;
 };
 
-function DayCell({slot, isExpanded, selectedTimezones, onSelectSlot, onEditEvent, onRemoveEvent, onToggleSkipSlot, onToggleExpanded}: DayCellProps) {
+function DayCell({slot, isExpanded, selectedTimezones, onSelectSlot, onEditEvent, onRemoveEvent, onToggleSkipSlot, onToggleExpanded, onAssignDriver}: DayCellProps) {
   const filteredEvents = slot.matchingEvents.filter((event) => !event.skippedDates.includes(slot.serverDate));
   const hasEvent = filteredEvents.length > 0;
 
@@ -272,6 +277,36 @@ function DayCell({slot, isExpanded, selectedTimezones, onSelectSlot, onEditEvent
                     </button>
                   </div>
                 </div>
+
+                {event.hasCrew && event.crewRoster.length > 0 ? (
+                  <div className="server-week-crew-row">
+                    <span className="crew-label">Driver:</span>
+                    <select
+                      className="cell-input crew-driver-select"
+                      value={(() => {
+                        const override = event.crewAssignmentOverrides[slot.serverDate];
+                        if (override) return override;
+                        const info = getDriverForDate(event, slot.serverDate);
+                        return info ? info.driver : "";
+                      })()}
+                      onChange={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        onAssignDriver(event.id, slot.serverDate, e.target.value);
+                      }}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                      }}
+                    >
+                      {event.crewRoster.map((member) => (
+                        <option key={member} value={member}>
+                          {member}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ) : null}
               </div>
             ))}
           </div>

@@ -15,6 +15,9 @@ export type PlannerEvent = {
   alarmEnabled: boolean;
   alarmLeadMinutes: number;
   skippedDates: string[];
+  hasCrew: boolean;
+  crewRoster: string[];
+  crewAssignmentOverrides: Record<string, string>;
 };
 
 export type AlternatingWeekState = {
@@ -57,6 +60,7 @@ export type ServerWeekHour = {
   timezoneLabels: Record<string, string>;
   isCurrentHour: boolean;
   matchingEvents: PlannerEvent[];
+  drivers: Array<{ eventId: string; driver?: string; driverIndex?: number }>;
 };
 
 const MINUTES_PER_DAY = 24 * 60;
@@ -86,6 +90,9 @@ export const DEFAULT_SERVER_TIME_STATE: ServerTimePlannerState = {
       alarmEnabled: true,
       alarmLeadMinutes: 15,
       skippedDates: [],
+      hasCrew: false,
+      crewRoster: [],
+      crewAssignmentOverrides: {},
     },
     {
       id: "weekly-war",
@@ -101,6 +108,9 @@ export const DEFAULT_SERVER_TIME_STATE: ServerTimePlannerState = {
       alarmEnabled: false,
       alarmLeadMinutes: 30,
       skippedDates: [],
+      hasCrew: false,
+      crewRoster: [],
+      crewAssignmentOverrides: {},
     },
   ],
   acknowledgedAlarmKeys: [],
@@ -145,6 +155,9 @@ const baseEvent: PlannerEvent = {
     alarmEnabled: false,
     alarmLeadMinutes: defaultLeadMinutes,
     skippedDates: [],
+    hasCrew: false,
+    crewRoster: [],
+    crewAssignmentOverrides: {},
   };
 
   return {
@@ -308,6 +321,33 @@ export function getNextEventOccurrence(
   return null;
 }
 
+export function getDriverForDate(
+  event: PlannerEvent,
+  serverDate: string
+): { driver: string; isOverride: boolean } | null {
+  if (!event.hasCrew || event.crewRoster.length === 0) return null;
+
+  if (event.crewAssignmentOverrides[serverDate]) {
+    return { driver: event.crewAssignmentOverrides[serverDate], isOverride: true };
+  }
+
+  const roster = event.crewRoster;
+  if (roster.length === 0) return null;
+
+  if (roster.length === 1) {
+    return { driver: roster[0], isOverride: false };
+  }
+
+  const date = parseDateInput(serverDate);
+  if (!date) return { driver: roster[0], isOverride: false };
+
+  const epoch = new Date(0);
+  const dayIndex = Math.floor((date.getTime() - epoch.getTime()) / DAY_MS);
+  const driverIndex = dayIndex % roster.length;
+
+  return { driver: roster[driverIndex], isOverride: false };
+}
+
 export function getEventScheduleSummary(
   event: PlannerEvent,
   alternatingState: AlternatingWeekState | null
@@ -411,6 +451,13 @@ export function buildServerWeekHours(
         )
       );
 
+      const drivers = matchingEvents.map((event) => {
+        const driverInfo = getDriverForDate(event, serverDate);
+        if (!driverInfo) return { eventId: event.id };
+        const rosterIndex = event.crewRoster.indexOf(driverInfo.driver);
+        return { eventId: event.id, driver: driverInfo.driver, driverIndex: rosterIndex };
+      });
+
       return {
         key: `${dayIndex}-${slotIndex}`,
         serverDayOfWeek: dayIndex,
@@ -423,6 +470,7 @@ export function buildServerWeekHours(
         timezoneLabels,
         isCurrentHour: currentContext.serverDayOfWeek === dayIndex && Math.floor(currentContext.serverMinutes / MINUTES_PER_SLOT) === slotIndex,
         matchingEvents,
+        drivers,
       };
     })
   );
@@ -500,6 +548,17 @@ function normalizeEvent(raw: unknown, index: number, fallbackLeadMinutes: number
     skippedDates: Array.isArray(event.skippedDates)
       ? (event.skippedDates as unknown[]).filter((d): d is string => typeof d === "string")
       : [],
+    hasCrew: Boolean(event.hasCrew),
+    crewRoster: Array.isArray(event.crewRoster)
+      ? (event.crewRoster as unknown[]).filter((r): r is string => typeof r === "string").filter((r) => r.length > 0)
+      : [],
+    crewAssignmentOverrides: typeof event.crewAssignmentOverrides === "object" && event.crewAssignmentOverrides !== null
+      ? (Object.entries(event.crewAssignmentOverrides as Record<string, unknown>)
+        .reduce<Record<string, string>>((acc, [k, v]) => {
+          if (typeof k === "string" && typeof v === "string") acc[k] = v;
+          return acc;
+        }, {}))
+      : {},
   };
 }
 

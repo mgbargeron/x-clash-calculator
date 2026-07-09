@@ -169,6 +169,45 @@ export default function ServerTimePage({navigation}: ServerTimePageProps) {
     }));
   }
 
+  function assignDriver(eventId: string, serverDate: string, driver: string) {
+    setPlannerState((current) => ({
+      ...current,
+      events: current.events.map((event) => {
+        if (event.id !== eventId) return event;
+        return {
+          ...event,
+          hasCrew: true,
+          crewAssignmentOverrides: {
+            ...event.crewAssignmentOverrides,
+            [serverDate]: driver,
+          },
+        };
+      }),
+    }));
+  }
+
+  function toggleCrew(eventId: string, enabled: boolean) {
+    setPlannerState((current) => ({
+      ...current,
+      events: current.events.map((event) => {
+        if (event.id !== eventId) return event;
+        return enabled
+          ? {
+              ...event,
+              hasCrew: true,
+              crewRoster: event.crewRoster.length > 0 ? event.crewRoster : [""],
+              crewAssignmentOverrides: enabled ? {} : {},
+            }
+          : {
+              ...event,
+              hasCrew: false,
+              crewRoster: [],
+              crewAssignmentOverrides: {},
+            };
+      }),
+    }));
+  }
+
   function toggleSkipDate(eventId: string, serverDate: string) {
     setPlannerState((current) => ({
       ...current,
@@ -457,6 +496,7 @@ export default function ServerTimePage({navigation}: ServerTimePageProps) {
         onEditEvent={editEvent}
         onRemoveEvent={removeEvent}
         onToggleSkipSlot={toggleSkipDate}
+        onAssignDriver={assignDriver}
       />
 
       <section className="server-time-panel">
@@ -514,6 +554,15 @@ export default function ServerTimePage({navigation}: ServerTimePageProps) {
                   <button className="secondary-button" type="button" onClick={() => editEvent(event.id)}>
                     Edit
                   </button>
+                  {event.type !== "oneTime" ? (
+                      <button
+                        className={`secondary-button ${event.hasCrew ? "active" : ""}`}
+                        type="button"
+                        onClick={() => toggleCrew(event.id, !event.hasCrew)}
+                      >
+                        {event.hasCrew ? "Crew: ON" : "Enable Crew"}
+                      </button>
+                    ) : null}
                   <button
                     className="secondary-button"
                     type="button"

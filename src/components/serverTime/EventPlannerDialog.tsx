@@ -39,6 +39,7 @@ export default function EventPlannerDialog({
 }: EventPlannerDialogProps) {
   const [draft, setDraft] = useState<PlannerEvent | null>(null);
   const [skipChecked, setSkipChecked] = useState(false);
+  const [newCrewMember, setNewCrewMember] = useState("");
 
   useEscapeClose(open, onClose);
   useDialogDraftSync(open, editingEvent, slot, plannerState, setDraft, setSkipChecked);
@@ -81,6 +82,33 @@ export default function EventPlannerDialog({
   }
 
   const isRecurringEvent = currentDraft.type !== "oneTime";
+
+  function addCrewMember() {
+    const name = newCrewMember.trim();
+    if (name && draft && !draft.crewRoster.includes(name)) {
+      setDraft((current) =>
+        current
+          ? { ...current, crewRoster: [...current.crewRoster, name] }
+          : current
+      );
+      setNewCrewMember("");
+    }
+  }
+
+  function removeCrewMember(name: string) {
+    setDraft((current) =>
+      current
+        ? {
+            ...current,
+            crewRoster: current.crewRoster.filter((n) => n !== name),
+            crewAssignmentOverrides: Object.entries(current.crewAssignmentOverrides).reduce<Record<string, string>>((acc, [k, v]) => {
+              if (v !== name) acc[k] = v;
+              return acc;
+            }, {}),
+          }
+        : current
+    );
+  }
 
   return (
     <div className="event-dialog-backdrop" role="presentation" onClick={onClose}>
@@ -215,6 +243,65 @@ export default function EventPlannerDialog({
               }
             />
           </label>
+
+          <div className="crew-section">
+            <label className="server-time-toggle">
+              <input
+                type="checkbox"
+                checked={currentDraft.hasCrew}
+                onChange={(inputEvent) =>
+                  updateDraft((current) => ({
+                    ...current,
+                    hasCrew: inputEvent.target.checked,
+                    crewRoster: inputEvent.target.checked ? current.crewRoster : [],
+                    crewAssignmentOverrides: {},
+                  }))
+                }
+              />
+              <span>Rotating Crew</span>
+            </label>
+
+            {currentDraft.hasCrew ? (
+              <>
+                <div className="crew-roster-list">
+                  {currentDraft.crewRoster.map((member) => (
+                    <div className="crew-roster-item" key={member}>
+                      <span>{member}</span>
+                      <button
+                        type="button"
+                        className="secondary-button crew-remove-btn"
+                        onClick={() => removeCrewMember(member)}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <div className="crew-add-row">
+                  <input
+                    className="cell-input"
+                    type="text"
+                    placeholder="Add crew member..."
+                    value={newCrewMember}
+                    onChange={(inputEvent) => setNewCrewMember(inputEvent.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        addCrewMember();
+                      }
+                    }}
+                  />
+                  <button
+                    className="secondary-button"
+                    type="button"
+                    onClick={addCrewMember}
+                  >
+                    Add
+                  </button>
+                </div>
+              </>
+            ) : null}
+          </div>
 
           <div className="event-dialog-toggles">
             <label className="server-time-toggle">
