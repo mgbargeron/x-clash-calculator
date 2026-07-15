@@ -453,6 +453,20 @@ body {
     font-size: 0.78rem;
 }
 
+.server-week-selector {
+    display: grid;
+    gap: 4px;
+    min-width: min(100%, 320px);
+    color: rgba(255, 255, 255, 0.74);
+    font-size: 0.78rem;
+}
+
+.server-week-selector .cell-input {
+    min-height: 38px;
+    padding: 8px 12px;
+    font-size: 0.86rem;
+}
+
 .server-week-view {
     width: 100%;
     min-height: 0;

@@ -346,7 +346,21 @@ export default function ServerWeekView({
   onToggleSkipSlot: (eventId: string, serverDate: string) => void;
   onAssignDriver: (eventId: string, serverDate: string, driver: string) => void;
 }) {
-  const weeksToShow = [0, -1, -2, -3, -4];
+  const weeksToShow = [0, 1, 2, 3, 4];
+  const [selectedWeekOffset, setSelectedWeekOffset] = useState(0);
+  const weekOptions = weeksToShow.map((offset) => {
+    const optionStart = new Date(weekStart.getTime() + offset * 7 * DAY_MS);
+    const optionEnd = new Date(optionStart.getTime() + 6 * DAY_MS);
+    const label = `${formatLocalDateTime(optionStart)} - ${formatLocalDateTime(optionEnd)}`;
+
+    return {
+      offset,
+      label: offset === 0 ? `${label} (Current Week)` : label,
+      start: optionStart,
+    };
+  });
+  const selectedWeek =
+    weekOptions.find((option) => option.offset === selectedWeekOffset) ?? weekOptions[0];
 
   return (
     <section className="server-time-panel server-week-panel">
@@ -355,34 +369,34 @@ export default function ServerWeekView({
           <h2>Server Weeks</h2>
           <small>Click a calendar slot to create an event.</small>
         </div>
+        <label className="server-week-selector">
+          <span>Week</span>
+          <select
+            className="cell-input"
+            value={selectedWeek.offset}
+            onChange={(event) => setSelectedWeekOffset(Number(event.target.value))}
+          >
+            {weekOptions.map((option) => (
+              <option key={option.offset} value={option.offset}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
       </div>
-      {weeksToShow.map((offset) => {
-        const weekOffsetStart = new Date(weekStart.getTime() + offset * 7 * DAY_MS);
-        const weekOffsetEnd = new Date(weekOffsetStart.getTime() + 6 * DAY_MS);
-        const weekLabel = `${formatLocalDateTime(weekOffsetStart)}-${formatLocalDateTime(weekOffsetEnd)}`;
-        const isCurrentWeek = offset === 0;
-        const weekLabelWithSuffix = isCurrentWeek ? `${weekLabel} (Current Week)` : weekLabel;
-
-        return (
-          <div key={offset} style={{marginBottom: "2rem", paddingBottom: "2rem", borderBottom: "1px solid rgba(255, 255, 255, 0.1)"}}>
-            <div className="server-time-panel-header" style={{marginBottom: "0.5rem"}}>
-              <h3>{weekLabelWithSuffix}</h3>
-            </div>
-            <WeekPanel
-              weekStart={weekOffsetStart}
-              now={now}
-              settings={settings}
-              events={events}
-              selectedTimezones={selectedTimezones}
-              onSelectSlot={onSelectSlot}
-              onEditEvent={onEditEvent}
-              onRemoveEvent={onRemoveEvent}
-              onToggleSkipSlot={onToggleSkipSlot}
-              onAssignDriver={onAssignDriver}
-            />
-          </div>
-        );
-      })}
+      <WeekPanel
+        key={selectedWeek.offset}
+        weekStart={selectedWeek.start}
+        now={now}
+        settings={settings}
+        events={events}
+        selectedTimezones={selectedTimezones}
+        onSelectSlot={onSelectSlot}
+        onEditEvent={onEditEvent}
+        onRemoveEvent={onRemoveEvent}
+        onToggleSkipSlot={onToggleSkipSlot}
+        onAssignDriver={onAssignDriver}
+      />
     </section>
   );
 }
