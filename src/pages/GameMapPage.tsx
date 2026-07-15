@@ -23,10 +23,11 @@ import { useUndoKeyboardShortcut } from "../hooks/useUndoKeyboardShortcut";
 import { useBeforeUnloadSave } from "../hooks/useBeforeUnloadSave";
 import { useMapStoreRefSync } from "../hooks/useMapStoreRefSync";
 import { useMapStoreSaver } from "../hooks/useMapStoreSaver";
-import { getSeasonConfig } from "../utils/gameMapConfig";
+import { getNextSeason, getSeasonConfig, getSeasonConfigEntry, normalizeSeason } from "../utils/gameMapConfig";
 import type { Season, GameMapConfig } from "../utils/gameMapConfig";
 
-const MAP_STORAGE_KEY = "game-map-v2";
+const MAP_STORAGE_KEY = "game-map-season";
+const LEGACY_SEASON_MAP_STORAGE_KEY = "game-map-v2";
 const LEGACY_MAP_STORAGE_KEY = "game-map-v1";
 const SEASON_STORAGE_KEY = "game-map-season";
 const DEFAULT_SERVER_ID = "001";
@@ -67,7 +68,11 @@ type StoredTile = {
 };
 
 function createSeasonStorageKey(season: Season): string {
-  return `${MAP_STORAGE_KEY}-s${season}`;
+  return `${MAP_STORAGE_KEY}-${season}`;
+}
+
+function createLegacySeasonStorageKey(season: Season): string {
+  return `${LEGACY_SEASON_MAP_STORAGE_KEY}-s${season}`;
 }
 
 function createStableId(prefix: string): string {
@@ -365,7 +370,7 @@ async function loadStoredMapStore(
 
   if (window.electronAPI.getMapData) {
     try {
-      raw = await window.electronAPI.getMapData();
+      raw = await window.electronAPI.getMapData(season);
     } catch {
       raw = null;
     }
@@ -380,8 +385,21 @@ async function loadStoredMapStore(
     }
   }
 
+  if (!raw) {
+    const legacySeasonKey = createLegacySeasonStorageKey(season);
+    try {
+      raw = JSON.parse(localStorage.getItem(legacySeasonKey) ?? "null");
+    } catch {
+      raw = null;
+    }
+  }
+
   if (raw) {
     return normalizeStoredMapStore(raw, mapConfig, firstTileId);
+  }
+
+  if (season !== 1) {
+    return createDefaultMapStore(mapConfig, firstTileId);
   }
 
   let legacyRaw: unknown = null;
@@ -405,7 +423,7 @@ async function saveStoredMapStore(store: MultiServerMapStore, season: Season) {
 
   if (window.electronAPI.setMapData) {
     try {
-      await window.electronAPI.setMapData(store);
+      await window.electronAPI.setMapData(store, season);
     } catch {
       // Ignore persistence failures outside localStorage.
     }
@@ -431,10 +449,9 @@ export default function GameMapPage({ navigation }: GameMapPageProps) {
   const [activeSeason, setActiveSeason] = useState<Season>(() => {
     try {
       const stored = localStorage.getItem(SEASON_STORAGE_KEY);
-      const parsed = Number(stored);
-      return parsed === 1 || parsed === 2 ? parsed : 1;
+      return normalizeSeason(stored);
     } catch {
-      return 1;
+      return normalizeSeason(null);
     }
   });
 
@@ -448,6 +465,7 @@ export default function GameMapPage({ navigation }: GameMapPageProps) {
   const [mapStore, setMapStore] = useState<MultiServerMapStore>(() =>
     createDefaultMapStore(mapConfig, firstTileId)
   );
+  const [loadedSeason, setLoadedSeason] = useState<Season | null>(null);
 
   const latestStoreRef = useRef(mapStore);
   const latestSnapshotRef = useRef(mapStore.serversById[mapStore.activeServerId]);
@@ -459,6 +477,9 @@ export default function GameMapPage({ navigation }: GameMapPageProps) {
   const [panelCollapsed, setPanelCollapsed] = useState(false);
 
   const activeServerSnapshot = mapStore.serversById[mapStore.activeServerId];
+  const activeSeasonConfig = getSeasonConfigEntry(activeSeason);
+  const activeSeasonLabel = activeSeasonConfig.label;
+  const nextSeason = getNextSeason(activeSeason);
   const {
     tiles,
     rivalTeams,
@@ -515,6 +536,10 @@ export default function GameMapPage({ navigation }: GameMapPageProps) {
 
   useEffect(() => {
     let cancelled = false;
+    hasLoadedStoredMap.current = false;
+    setLoadedSeason(null);
+    applyMapStore(createDefaultMapStore(mapConfig, firstTileId));
+    clearUndoHistory();
 
     void loadStoredMapStore(mapConfig, firstTileId, activeSeason).then((storedMapStore) => {
       if (cancelled) return;
@@ -522,6 +547,7 @@ export default function GameMapPage({ navigation }: GameMapPageProps) {
       applyMapStore(storedMapStore);
       clearUndoHistory();
       hasLoadedStoredMap.current = true;
+      setLoadedSeason(activeSeason);
     });
 
     return () => {
@@ -531,7 +557,7 @@ export default function GameMapPage({ navigation }: GameMapPageProps) {
 
   useMapStoreRefSync(latestStoreRef, latestSnapshotRef, mapStore, activeServerSnapshot);
 
-  useMapStoreSaver(mapStore, activeSeason);
+  useMapStoreSaver(mapStore, activeSeason, loadedSeason === activeSeason);
 
   const flushLatestState = useEffectEvent(() => {
     if (!hasLoadedStoredMap.current) return;
@@ -853,6 +879,11 @@ export default function GameMapPage({ navigation }: GameMapPageProps) {
     return Math.min(MAX_MAP_ZOOM, Math.max(MIN_MAP_ZOOM, Number(value.toFixed(2))));
   }
 
+  function switchSeason() {
+    void saveStoredMapStore(latestStoreRef.current, activeSeason);
+    setActiveSeason(nextSeason);
+  }
+
   const kbdStyle: CSSProperties = {
     display: "inline-flex",
     alignItems: "center",
@@ -868,23 +899,21 @@ export default function GameMapPage({ navigation }: GameMapPageProps) {
   return (
     <section className="card map-page">
       <div className="page-title-row">
-        <div>
+        <div className="page-title-copy">
           <p className="eyebrow">Planning board</p>
           <h1>Game Map</h1>
         </div>
+        <h2 className="season-page-heading">{activeSeasonLabel}</h2>
         <div className="page-header-controls">
           {navigation}
           <button
-            className={`season-toggle-button ${activeSeason === 2 ? "season-2-active" : ""}`}
+            className="season-toggle-button"
             type="button"
-            onClick={() => {
-              const nextSeason = activeSeason === 2 ? 1 : 2;
-              setActiveSeason(nextSeason);
-            }}
-            title={`Switch to Season ${activeSeason === 2 ? "1" : "2"}`}
+            onClick={switchSeason}
+            title={`Switch to Season ${nextSeason}`}
             aria-label="Switch season"
           >
-            {activeSeason === 2 ? "S2" : "S1"}
+            Switch to Season {nextSeason}
           </button>
         </div>
       </div>

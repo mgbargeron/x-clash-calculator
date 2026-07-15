@@ -3,7 +3,14 @@ const fs = require('fs/promises')
 const path = require('path')
 
 const mapDataPath = () => path.join(app.getPath('userData'), 'game-map-data.json')
+const seasonMapDataPath = (season) => path.join(app.getPath('userData'), `game-map-season-${season}.json`)
+const legacySeasonMapDataPath = (season) => path.join(app.getPath('userData'), `game-map-data-s${season}.json`)
 const serverTimeDataPath = () => path.join(app.getPath('userData'), 'server-time-data.json')
+
+function normalizeSeason(value) {
+  const parsed = Number(value)
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : 1
+}
 
 function formatError(error) {
   if (!error) return 'Unknown error'
@@ -66,13 +73,35 @@ function buildErrorPage(title, detail) {
 </html>`)}`
 }
 
-ipcMain.handle('map-storage:get', async () => {
+ipcMain.handle('map-storage:get', async (_event, seasonValue) => {
+  const season = normalizeSeason(seasonValue)
+
   try {
-    const raw = await fs.readFile(mapDataPath(), 'utf8')
+    const raw = await fs.readFile(seasonMapDataPath(season), 'utf8')
     return JSON.parse(raw)
   } catch (error) {
     if (error.code === 'ENOENT') {
-      return null
+      try {
+        const raw = await fs.readFile(legacySeasonMapDataPath(season), 'utf8')
+        return JSON.parse(raw)
+      } catch (legacySeasonError) {
+        if (legacySeasonError.code !== 'ENOENT') {
+          console.error('Failed to read legacy season map data', legacySeasonError)
+        }
+      }
+
+      if (season !== 1) return null
+
+      try {
+        const raw = await fs.readFile(mapDataPath(), 'utf8')
+        return JSON.parse(raw)
+      } catch (legacyError) {
+        if (legacyError.code !== 'ENOENT') {
+          console.error('Failed to read legacy map data', legacyError)
+        }
+
+        return null
+      }
     }
 
     console.error('Failed to read map data', error)
@@ -80,10 +109,13 @@ ipcMain.handle('map-storage:get', async () => {
   }
 })
 
-ipcMain.handle('map-storage:set', async (_event, data) => {
+ipcMain.handle('map-storage:set', async (_event, data, seasonValue) => {
+  const season = normalizeSeason(seasonValue)
+  const dataPath = seasonMapDataPath(season)
+
   try {
-    await fs.mkdir(path.dirname(mapDataPath()), { recursive: true })
-    await fs.writeFile(mapDataPath(), JSON.stringify(data, null, 2), 'utf8')
+    await fs.mkdir(path.dirname(dataPath), { recursive: true })
+    await fs.writeFile(dataPath, JSON.stringify(data, null, 2), 'utf8')
     return { ok: true }
   } catch (error) {
     console.error('Failed to save map data', error)

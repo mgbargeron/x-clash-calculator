@@ -23,7 +23,7 @@ export type GameMapConfig = {
   tiles: GameMapTileConfig[];
 };
 
-export type Season = 1 | 2;
+export type Season = number;
 
 export type SeasonConfig = {
   seasonNumber: Season;
@@ -48,6 +48,39 @@ export const allSeasonConfigs: SeasonConfig[] = [
   { seasonNumber: 2, mapConfig: seasonTwoMapConfig, label: "Season 2" },
 ];
 
+const DEFAULT_SEASON = allSeasonConfigs[0]?.seasonNumber ?? 1;
+
+export function getDefaultSeason(): Season {
+  return DEFAULT_SEASON;
+}
+
+export function getSeasonConfigEntry(season: Season): SeasonConfig {
+  return (
+    allSeasonConfigs.find((config) => config.seasonNumber === season) ??
+    allSeasonConfigs[0] ?? {
+      seasonNumber: DEFAULT_SEASON,
+      mapConfig: defaultGameMapConfig,
+      label: `Season ${DEFAULT_SEASON}`,
+    }
+  );
+}
+
+export function isConfiguredSeason(value: unknown): value is Season {
+  if (typeof value !== "number" || !Number.isInteger(value)) return false;
+  return allSeasonConfigs.some((config) => config.seasonNumber === value);
+}
+
+export function normalizeSeason(value: unknown): Season {
+  const parsed = typeof value === "number" ? value : Number(value);
+  return isConfiguredSeason(parsed) ? parsed : getDefaultSeason();
+}
+
+export function getNextSeason(season: Season): Season {
+  const currentIndex = allSeasonConfigs.findIndex((config) => config.seasonNumber === season);
+  const nextIndex = currentIndex >= 0 ? (currentIndex + 1) % allSeasonConfigs.length : 0;
+  return allSeasonConfigs[nextIndex]?.seasonNumber ?? getDefaultSeason();
+}
+
 export function getSeasonConfig(season: Season): GameMapConfig {
-  return season === 2 ? seasonTwoMapConfig : defaultGameMapConfig;
+  return getSeasonConfigEntry(season).mapConfig;
 }

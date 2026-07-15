@@ -1,20 +1,23 @@
 import { useEffect, useCallback } from "react";
+import type { Season } from "../utils/gameMapConfig";
 
-export function useMapStoreSaver(mapStore: unknown, activeSeason: 1 | 2) {
+export function useMapStoreSaver(mapStore: unknown, activeSeason: Season, enabled = true) {
   const handleSave = useCallback(() => {
-    const MAP_STORAGE_KEY = "game-map-v2";
+    if (!enabled) return;
 
-    function createSeasonStorageKey(season: 1 | 2): string {
-      return `${MAP_STORAGE_KEY}-s${season}`;
+    const MAP_STORAGE_KEY = "game-map-season";
+
+    function createSeasonStorageKey(season: Season): string {
+      return `${MAP_STORAGE_KEY}-${season}`;
     }
 
     const serialized = JSON.stringify(mapStore);
     localStorage.setItem(createSeasonStorageKey(activeSeason), serialized);
 
     if (window.electronAPI.setMapData) {
-      void window.electronAPI.setMapData(mapStore);
+      void window.electronAPI.setMapData(mapStore, activeSeason);
     }
-  }, [mapStore, activeSeason]);
+  }, [mapStore, activeSeason, enabled]);
 
   useEffect(() => {
     handleSave();

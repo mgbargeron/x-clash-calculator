@@ -998,31 +998,42 @@ body {
 }
 
 .page-title-row {
-    display: flex;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
     align-items: center;
-    justify-content: space-between;
     gap: 18px;
-    flex-wrap: wrap;
 }
 
-.page-title-row > div {
+.page-title-copy {
     display: grid;
     gap: 8px;
     min-width: 0;
 }
 
+.season-page-heading {
+    justify-self: center;
+    margin: 0;
+    color: #f5f7ff;
+    font-size: clamp(2rem, 5vw, 4rem);
+    line-height: 1;
+    font-weight: 800;
+    text-align: center;
+}
+
 .page-header-controls {
     display: flex;
     align-items: center;
+    justify-content: flex-end;
     gap: 12px;
+    min-width: 0;
 }
 
 .season-toggle-button {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 36px;
-    height: 36px;
+    min-height: 40px;
+    padding: 0 14px;
     border-radius: 6px;
     border: 1px solid rgba(255, 255, 255, 0.1);
     background: rgba(255, 255, 255, 0.05);
@@ -1033,6 +1044,7 @@ body {
     cursor: pointer;
     transition: background 0.15s, color 0.15s, border-color 0.15s;
     flex-shrink: 0;
+    white-space: nowrap;
 }
 
 .season-toggle-button:hover {
@@ -1042,17 +1054,6 @@ body {
 
 .season-toggle-button:active {
     background: rgba(255, 255, 255, 0.15);
-}
-
-.season-toggle-button.season-2-active {
-    background: rgba(180, 110, 255, 0.15);
-    border-color: rgba(180, 110, 255, 0.3);
-    color: #cba6ff;
-}
-
-.season-toggle-button.season-2-active:hover {
-    background: rgba(180, 110, 255, 0.25);
-    color: #e0c4ff;
 }
 
 .calculator-wrapper {
@@ -2557,7 +2558,18 @@ h1 {
 
     .page-title-row {
         align-items: start;
-        flex-direction: column;
+        grid-template-columns: 1fr;
+    }
+
+    .season-page-heading {
+        justify-self: start;
+        font-size: 2.5rem;
+    }
+
+    .page-header-controls {
+        width: 100%;
+        justify-content: flex-start;
+        flex-wrap: wrap;
     }
 
     .table {
