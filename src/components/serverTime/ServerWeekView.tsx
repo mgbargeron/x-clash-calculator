@@ -10,7 +10,9 @@ import {
   getDriverForDate,
 } from "../../utils/serverTime";
 
-type ServerWeekViewProps = {
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+type WeekPanelProps = {
   weekStart: Date;
   now: Date;
   settings: ServerTimeSettings;
@@ -23,7 +25,7 @@ type ServerWeekViewProps = {
   onAssignDriver: (eventId: string, serverDate: string, driver: string) => void;
 };
 
-export default function ServerWeekView({
+function WeekPanel({
   weekStart,
   now,
   settings,
@@ -34,7 +36,7 @@ export default function ServerWeekView({
   onRemoveEvent,
   onToggleSkipSlot,
   onAssignDriver,
-}: ServerWeekViewProps) {
+}: WeekPanelProps) {
   const weekHours = buildServerWeekHours(
     weekStart,
     now,
@@ -319,4 +321,68 @@ function DayCell({slot, isExpanded, selectedTimezones, onSelectSlot, onEditEvent
 function shortTimezoneLabel(timezone: string): string {
   const parts = timezone.split("/");
   return parts[parts.length - 1]?.replace(/_/g, " ") ?? timezone;
+}
+
+export default function ServerWeekView({
+  weekStart,
+  now,
+  settings,
+  events,
+  selectedTimezones,
+  onSelectSlot,
+  onEditEvent,
+  onRemoveEvent,
+  onToggleSkipSlot,
+  onAssignDriver,
+}: {
+  weekStart: Date;
+  now: Date;
+  settings: ServerTimeSettings;
+  events: PlannerEvent[];
+  selectedTimezones: string[];
+  onSelectSlot: (slot: ServerWeekHour) => void;
+  onEditEvent: (eventId: string) => void;
+  onRemoveEvent: (eventId: string) => void;
+  onToggleSkipSlot: (eventId: string, serverDate: string) => void;
+  onAssignDriver: (eventId: string, serverDate: string, driver: string) => void;
+}) {
+  const weeksToShow = [0, -1, -2, -3, -4];
+
+  return (
+    <section className="server-time-panel server-week-panel">
+      <div className="server-time-panel-header" style={{marginBottom: "1rem"}}>
+        <div>
+          <h2>Server Weeks</h2>
+          <small>Click a calendar slot to create an event.</small>
+        </div>
+      </div>
+      {weeksToShow.map((offset) => {
+        const weekOffsetStart = new Date(weekStart.getTime() + offset * 7 * DAY_MS);
+        const weekOffsetEnd = new Date(weekOffsetStart.getTime() + 6 * DAY_MS);
+        const weekLabel = `${formatLocalDateTime(weekOffsetStart)}-${formatLocalDateTime(weekOffsetEnd)}`;
+        const isCurrentWeek = offset === 0;
+        const weekLabelWithSuffix = isCurrentWeek ? `${weekLabel} (Current Week)` : weekLabel;
+
+        return (
+          <div key={offset} style={{marginBottom: "2rem", paddingBottom: "2rem", borderBottom: "1px solid rgba(255, 255, 255, 0.1)"}}>
+            <div className="server-time-panel-header" style={{marginBottom: "0.5rem"}}>
+              <h3>{weekLabelWithSuffix}</h3>
+            </div>
+            <WeekPanel
+              weekStart={weekOffsetStart}
+              now={now}
+              settings={settings}
+              events={events}
+              selectedTimezones={selectedTimezones}
+              onSelectSlot={onSelectSlot}
+              onEditEvent={onEditEvent}
+              onRemoveEvent={onRemoveEvent}
+              onToggleSkipSlot={onToggleSkipSlot}
+              onAssignDriver={onAssignDriver}
+            />
+          </div>
+        );
+      })}
+    </section>
+  );
 }
