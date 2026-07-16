@@ -7,6 +7,8 @@ type MapTileStyle = CSSProperties & {
   "--base-color": string;
   "--rival-color": string;
   "--enemy-color": string;
+  "--tile-shape-columns"?: number;
+  "--tile-shape-rows"?: number;
 };
 
 type MapTileComponentProps = {
@@ -28,6 +30,55 @@ function getCoordinate(tile: GameMapTileConfig): string {
   return `${rowLabel}${tile.x}`;
 }
 
+function getTileSpan(value: unknown): number {
+  return typeof value === "number" && Number.isFinite(value) && value > 0
+    ? Math.floor(value)
+    : 1;
+}
+
+function getShapeCells(tile: GameMapTileConfig): Array<{ column: number; row: number }> {
+  const width = getTileSpan(tile.width);
+  const height = getTileSpan(tile.height);
+  const shape = Array.isArray(tile.shape) && tile.shape.length > 0 ? tile.shape : null;
+
+  if (!shape) return [];
+
+  const cells: Array<{ column: number; row: number }> = [];
+
+  for (let row = 0; row < height; row += 1) {
+    const shapeRow = typeof shape[row] === "string" ? shape[row] : "";
+
+    for (let column = 0; column < width; column += 1) {
+      if ((shapeRow[column] ?? "X") !== ".") {
+        cells.push({ column: column + 1, row: row + 1 });
+      }
+    }
+  }
+
+  return cells;
+}
+
+function getShapeOutlinePath(cells: Array<{ column: number; row: number }>): string {
+  const occupiedCells = new Set(cells.map((cell) => `${cell.column},${cell.row}`));
+  const segments: string[] = [];
+
+  for (const cell of cells) {
+    const column = cell.column - 1;
+    const row = cell.row - 1;
+    const hasTopNeighbor = occupiedCells.has(`${cell.column},${cell.row - 1}`);
+    const hasRightNeighbor = occupiedCells.has(`${cell.column + 1},${cell.row}`);
+    const hasBottomNeighbor = occupiedCells.has(`${cell.column},${cell.row + 1}`);
+    const hasLeftNeighbor = occupiedCells.has(`${cell.column - 1},${cell.row}`);
+
+    if (!hasTopNeighbor) segments.push(`M ${column} ${row} H ${column + 1}`);
+    if (!hasRightNeighbor) segments.push(`M ${column + 1} ${row} V ${row + 1}`);
+    if (!hasBottomNeighbor) segments.push(`M ${column + 1} ${row + 1} H ${column}`);
+    if (!hasLeftNeighbor) segments.push(`M ${column} ${row + 1} V ${row}`);
+  }
+
+  return segments.join(" ");
+}
+
 export function MapTileComponent({
   tileConfig,
   tileData,
@@ -41,18 +92,88 @@ export function MapTileComponent({
   onPaint,
   onClear,
 }: MapTileComponentProps) {
+  const tileWidth = getTileSpan(tileConfig.width);
+  const tileHeight = getTileSpan(tileConfig.height);
+  const shapeCells = getShapeCells(tileConfig);
+  const shapeOutlinePath = getShapeOutlinePath(shapeCells);
+  const hasCustomShape = Array.isArray(tileConfig.shape) && tileConfig.shape.length > 0;
   const tileTitle =
     tileData.note ||
     (occupantLabel
       ? `${occupantLabel} ${getCoordinate(tileConfig)} ${tileConfig.kind} level ${tileConfig.level}`
       : `${getCoordinate(tileConfig)} ${tileConfig.kind} level ${tileConfig.level}`);
   const chipClassName = tileConfig.kind === "town" ? "map-chip town-chip" : "map-chip mine-chip";
+  const className = `map-tile ${tileData.marker} ${tileConfig.kind} ${
+    isSelected ? "selected" : ""
+  }`;
+  const style = {
+    gridColumn: `${tileConfig.x} / span ${tileWidth}`,
+    gridRow: `${tileConfig.y} / span ${tileHeight}`,
+    "--base-color": baseColor,
+    "--rival-color": rivalColor,
+    "--enemy-color": enemyColor,
+  } as MapTileStyle;
+
+  if (hasCustomShape) {
+    return (
+      <div
+        className={`${className} map-tile-shaped`}
+        aria-label={`Map tile ${getCoordinate(tileConfig)} ${tileConfig.kind} level ${tileConfig.level}`}
+        title={tileTitle}
+        style={{
+          ...style,
+          "--tile-shape-columns": tileWidth,
+          "--tile-shape-rows": tileHeight,
+        } as MapTileStyle}
+      >
+        {shapeCells.map((cell) => (
+          <button
+            key={`${cell.column}-${cell.row}`}
+            className="map-tile-shape-cell"
+            type="button"
+            onClick={() => {
+              onPaint(tileConfig.id);
+            }}
+            onContextMenu={(event) => {
+              if (tileData.marker === "none") {
+                return;
+              }
+
+              event.preventDefault();
+              onClear(tileConfig.id);
+            }}
+            onFocus={() => onSelect(tileConfig.id)}
+            aria-label={`Map tile ${getCoordinate(tileConfig)} ${tileConfig.kind} level ${tileConfig.level}`}
+            title={tileTitle}
+            style={{
+              gridColumn: cell.column,
+              gridRow: cell.row,
+            }}
+          />
+        ))}
+        {shapeOutlinePath ? (
+          <svg
+            className="map-tile-shape-outline"
+            viewBox={`0 0 ${tileWidth} ${tileHeight}`}
+            preserveAspectRatio="none"
+            aria-hidden="true"
+            focusable="false"
+          >
+            <path className="map-tile-shape-marker" d={shapeOutlinePath} />
+            <path className="map-tile-shape-selected" d={shapeOutlinePath} />
+          </svg>
+        ) : null}
+        <span className={chipClassName}>
+          <span className="tile-badge-level">{tileConfig.level}</span>
+          {occupantCode ? <span className="tile-badge-code">{occupantCode}</span> : null}
+        </span>
+      </div>
+    );
+  }
 
   return (
     <button
-      className={`map-tile ${tileData.marker} ${tileConfig.kind} ${
-        isSelected ? "selected" : ""
-      }`}
+      className={className}
       type="button"
       onClick={() => {
         onPaint(tileConfig.id);
@@ -68,13 +189,7 @@ export function MapTileComponent({
       onFocus={() => onSelect(tileConfig.id)}
       aria-label={`Map tile ${getCoordinate(tileConfig)} ${tileConfig.kind} level ${tileConfig.level}`}
       title={tileTitle}
-      style={{
-        gridColumn: `${tileConfig.x} / span ${tileConfig.width}`,
-        gridRow: `${tileConfig.y} / span ${tileConfig.height}`,
-        "--base-color": baseColor,
-        "--rival-color": rivalColor,
-        "--enemy-color": enemyColor,
-      } as MapTileStyle}
+      style={style}
     >
       <span className={chipClassName}>
         <span className="tile-badge-level">{tileConfig.level}</span>

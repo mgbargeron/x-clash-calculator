@@ -62,6 +62,7 @@ export type GameMapTileConfig = {
   height?: number;
   kind: GameMapTileKind;
   level: number;
+  shape?: string[];
 };
 
 export type GameMapConfig = {

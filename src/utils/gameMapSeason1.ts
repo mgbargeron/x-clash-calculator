@@ -2,10 +2,11 @@ type GameMapTileConfig = {
   id: string;
   x: number;
   y: number;
-  width: 1 | 2;
-  height: 1 | 2;
+  width: number;
+  height: number;
   kind: "town" | "frostMine";
   level: number;
+  shape?: string[];
 };
 
 export const seasonOneTiles: GameMapTileConfig[] = [

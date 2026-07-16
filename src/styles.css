@@ -1590,6 +1590,11 @@ h1 {
     outline-offset: 1px;
 }
 
+.map-tile-shaped:focus-visible,
+.map-tile-shaped.selected {
+    outline: 0;
+}
+
 .map-tile.base {
     box-shadow: inset 0 0 0 3px var(--base-color, #45b66b);
 }
@@ -1606,8 +1611,115 @@ h1 {
     background: #232338;
 }
 
-.map-tile.frostMine {
+.map-tile.frostMine,
+.map-tile.copperMine {
     background: #172035;
+}
+
+.map-tile-shaped {
+    --tile-shape-columns: 1;
+    --tile-shape-rows: 1;
+    display: grid;
+    grid-template-columns: repeat(var(--tile-shape-columns), minmax(0, 1fr));
+    grid-template-rows: repeat(var(--tile-shape-rows), minmax(0, 1fr));
+    gap: 0;
+    place-items: stretch;
+    overflow: visible;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+    cursor: default;
+    pointer-events: none;
+}
+
+.map-tile-shaped.base,
+.map-tile-shaped.enemy,
+.map-tile-shaped.rival {
+    box-shadow: none;
+}
+
+.map-tile-shaped.town,
+.map-tile-shaped.frostMine,
+.map-tile-shaped.copperMine {
+    background: transparent;
+}
+
+.map-tile-shape-cell {
+    appearance: none;
+    display: block;
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: #172035;
+    color: #f5f7ff;
+    cursor: pointer;
+    pointer-events: auto;
+}
+
+.map-tile-shaped.town .map-tile-shape-cell {
+    background: #232338;
+}
+
+.map-tile-shaped.frostMine .map-tile-shape-cell,
+.map-tile-shaped.copperMine .map-tile-shape-cell {
+    background: #172035;
+}
+
+.map-tile-shaped .map-chip {
+    position: absolute;
+    inset: 50% auto auto 50%;
+    z-index: 2;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+}
+
+.map-tile-shape-outline {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+    pointer-events: none;
+}
+
+.map-tile-shape-marker,
+.map-tile-shape-selected {
+    fill: none;
+    stroke-linecap: square;
+    stroke-linejoin: miter;
+    vector-effect: non-scaling-stroke;
+}
+
+.map-tile-shape-marker {
+    stroke: transparent;
+    stroke-width: 3px;
+}
+
+.map-tile-shaped.base .map-tile-shape-marker {
+    stroke: var(--base-color, #45b66b);
+}
+
+.map-tile-shaped.enemy .map-tile-shape-marker {
+    stroke: var(--enemy-color, #cf3f45);
+}
+
+.map-tile-shaped.rival .map-tile-shape-marker {
+    stroke: var(--rival-color, #d8aa32);
+}
+
+.map-tile-shape-selected {
+    stroke: transparent;
+    stroke-width: 4px;
+}
+
+.map-tile-shaped.selected .map-tile-shape-selected,
+.map-tile-shaped:focus-within .map-tile-shape-selected {
+    stroke: rgba(157, 177, 255, 0.78);
 }
 
 .map-chip {

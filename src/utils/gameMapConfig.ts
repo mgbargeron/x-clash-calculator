@@ -1,20 +1,25 @@
 import { seasonOneTiles as s1Tiles } from "./gameMapSeason1";
-import { seasonTwoTiles as s2Tiles } from "./gameMapSeason2";
+import {
+  seasonTwoColumns,
+  seasonTwoRowsCount,
+  seasonTwoTiles as s2Tiles,
+} from "./gameMapSeason2";
 
 export { seasonOneTiles } from "./gameMapSeason1";
 export { seasonTwoTiles } from "./gameMapSeason2";
 
-export type GameMapTileKind = "town" | "frostMine";
+export type GameMapTileKind = "town" | "frostMine" | "copperMine" | "tradeCenter";
 
 export type GameMapTileConfig = {
   id: string;
   x: number;
   y: number;
-  width: 1 | 2;
-  height: 1 | 2;
+  width: number;
+  height: number;
   kind: GameMapTileKind;
   level: number;
   label?: string;
+  shape?: string[];
 };
 
 export type GameMapConfig = {
@@ -38,8 +43,8 @@ export const defaultGameMapConfig: GameMapConfig = {
 };
 
 export const seasonTwoMapConfig: GameMapConfig = {
-  columns: 20,
-  rows: 20,
+  columns: seasonTwoColumns,
+  rows: seasonTwoRowsCount,
   tiles: s2Tiles,
 };
 
