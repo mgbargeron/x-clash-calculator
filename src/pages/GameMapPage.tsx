@@ -32,10 +32,10 @@ const LEGACY_MAP_STORAGE_KEY = "game-map-v1";
 const SEASON_STORAGE_KEY = "game-map-season";
 const DEFAULT_SERVER_ID = "001";
 const MAX_ACTION_HISTORY = 10;
-const MIN_MAP_ZOOM = 0.75;
+const MIN_MAP_ZOOM = 0.25;
 const MAX_MAP_ZOOM = 2;
-const DEFAULT_MAP_ZOOM = 1.2;
-const MAP_ZOOM_STEP = 0.1;
+const DEFAULT_MAP_ZOOM = 1;
+const MAP_ZOOM_STEP = 0.05;
 const DEFAULT_OUR_TEAM: OurTeamConfig = { color: "#45b66b", name: "Our Team", code: "OUR" };
 const DEFAULT_RIVAL_COLOR = "#9d8465";
 
@@ -879,6 +879,42 @@ export default function GameMapPage({ navigation }: GameMapPageProps) {
     return Math.min(MAX_MAP_ZOOM, Math.max(MIN_MAP_ZOOM, Number(value.toFixed(2))));
   }
 
+  function getFitMapZoom(currentZoom: number): number | null {
+    const boardShell = boardRef.current;
+    const boardFrame = boardShell?.querySelector<HTMLElement>(".map-board-frame");
+
+    if (!boardShell || !boardFrame || currentZoom <= 0) {
+      return null;
+    }
+
+    const shellWidth = boardShell.clientWidth;
+    const shellHeight = boardShell.clientHeight;
+    const unscaledWidth = boardFrame.offsetWidth / currentZoom;
+    const unscaledHeight = boardFrame.offsetHeight / currentZoom;
+
+    if (shellWidth <= 0 || shellHeight <= 0 || unscaledWidth <= 0 || unscaledHeight <= 0) {
+      return null;
+    }
+
+    return clampMapZoom(Math.min(shellWidth / unscaledWidth, shellHeight / unscaledHeight));
+  }
+
+  function fitMapToView() {
+    const nextZoom = getFitMapZoom(mapZoom);
+    if (nextZoom === null) return;
+    setMapZoom(nextZoom);
+  }
+
+  useEffect(() => {
+    const animationFrameId = window.requestAnimationFrame(() => {
+      const nextZoom = getFitMapZoom(mapZoom);
+      if (nextZoom === null) return;
+      setMapZoom(nextZoom);
+    });
+
+    return () => window.cancelAnimationFrame(animationFrameId);
+  }, [activeSeason, mapConfig.columns, mapConfig.rows, panelCollapsed]);
+
   function switchSeason() {
     void saveStoredMapStore(latestStoreRef.current, activeSeason);
     setActiveSeason(nextSeason);
@@ -995,6 +1031,14 @@ export default function GameMapPage({ navigation }: GameMapPageProps) {
               aria-label="Reset map zoom"
             >
               {Math.round(mapZoom * 100)}%
+            </button>
+            <button
+              className="map-zoom-reset"
+              type="button"
+              onClick={fitMapToView}
+              aria-label="Fit map to view"
+            >
+              Fit
             </button>
           </div>
         </div>
