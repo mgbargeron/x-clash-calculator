@@ -881,22 +881,28 @@ export default function GameMapPage({ navigation }: GameMapPageProps) {
 
   function getFitMapZoom(currentZoom: number): number | null {
     const boardShell = boardRef.current;
+    const boardScroller = boardShell?.querySelector<HTMLElement>(".map-board-scroller");
     const boardFrame = boardShell?.querySelector<HTMLElement>(".map-board-frame");
 
-    if (!boardShell || !boardFrame || currentZoom <= 0) {
+    if (!boardShell || !boardScroller || !boardFrame || currentZoom <= 0) {
       return null;
     }
 
-    const shellWidth = boardShell.clientWidth;
-    const shellHeight = boardShell.clientHeight;
+    const scrollerStyle = window.getComputedStyle(boardScroller);
+    const horizontalPadding =
+      Number.parseFloat(scrollerStyle.paddingLeft) + Number.parseFloat(scrollerStyle.paddingRight);
+    const verticalPadding =
+      Number.parseFloat(scrollerStyle.paddingTop) + Number.parseFloat(scrollerStyle.paddingBottom);
+    const availableWidth = boardScroller.clientWidth - horizontalPadding;
+    const availableHeight = boardScroller.clientHeight - verticalPadding;
     const unscaledWidth = boardFrame.offsetWidth / currentZoom;
     const unscaledHeight = boardFrame.offsetHeight / currentZoom;
 
-    if (shellWidth <= 0 || shellHeight <= 0 || unscaledWidth <= 0 || unscaledHeight <= 0) {
+    if (availableWidth <= 0 || availableHeight <= 0 || unscaledWidth <= 0 || unscaledHeight <= 0) {
       return null;
     }
 
-    return clampMapZoom(Math.min(shellWidth / unscaledWidth, shellHeight / unscaledHeight));
+    return clampMapZoom(Math.min(availableWidth / unscaledWidth, availableHeight / unscaledHeight));
   }
 
   function fitMapToView() {
