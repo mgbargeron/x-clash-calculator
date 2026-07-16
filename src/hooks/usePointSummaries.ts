@@ -37,9 +37,9 @@ export function usePointSummaries({
 
       summary.count += 1;
       if (tileConfig.kind === "town") {
-        summary.townPoints += tileConfig.level;
-      } else {
-        summary.frostMinePoints += tileConfig.level;
+        summary.townPoints += tileConfig.level ?? 0;
+      } else if (tileConfig.kind === "frostMine" || tileConfig.kind === "copperMine") {
+        summary.frostMinePoints += tileConfig.level ?? 0;
       }
     }
 
@@ -54,9 +54,9 @@ export function usePointSummaries({
 
       summary.count += 1;
       if (tileConfig.kind === "town") {
-        summary.townPoints += tileConfig.level;
-      } else {
-        summary.frostMinePoints += tileConfig.level;
+        summary.townPoints += tileConfig.level ?? 0;
+      } else if (tileConfig.kind === "frostMine" || tileConfig.kind === "copperMine") {
+        summary.frostMinePoints += tileConfig.level ?? 0;
       }
     }
 
@@ -81,9 +81,9 @@ export function usePointSummaries({
 
       summary.count += 1;
       if (tileConfig.kind === "town") {
-        summary.townPoints += tileConfig.level;
-      } else {
-        summary.frostMinePoints += tileConfig.level;
+        summary.townPoints += tileConfig.level ?? 0;
+      } else if (tileConfig.kind === "frostMine" || tileConfig.kind === "copperMine") {
+        summary.frostMinePoints += tileConfig.level ?? 0;
       }
     }
 

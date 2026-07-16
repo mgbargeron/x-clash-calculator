@@ -79,6 +79,15 @@ function getShapeOutlinePath(cells: Array<{ column: number; row: number }>): str
   return segments.join(" ");
 }
 
+function getTileLabel(tile: GameMapTileConfig): string {
+  return tile.label ?? tile.kind;
+}
+
+function getTileDescription(tile: GameMapTileConfig): string {
+  const levelText = typeof tile.level === "number" ? ` level ${tile.level}` : "";
+  return `${getCoordinate(tile)} ${getTileLabel(tile)}${levelText}`;
+}
+
 export function MapTileComponent({
   tileConfig,
   tileData,
@@ -97,12 +106,17 @@ export function MapTileComponent({
   const shapeCells = getShapeCells(tileConfig);
   const shapeOutlinePath = getShapeOutlinePath(shapeCells);
   const hasCustomShape = Array.isArray(tileConfig.shape) && tileConfig.shape.length > 0;
+  const tileDescription = getTileDescription(tileConfig);
+  const hasLevel = typeof tileConfig.level === "number";
   const tileTitle =
     tileData.note ||
-    (occupantLabel
-      ? `${occupantLabel} ${getCoordinate(tileConfig)} ${tileConfig.kind} level ${tileConfig.level}`
-      : `${getCoordinate(tileConfig)} ${tileConfig.kind} level ${tileConfig.level}`);
-  const chipClassName = tileConfig.kind === "town" ? "map-chip town-chip" : "map-chip mine-chip";
+    (occupantLabel ? `${occupantLabel} ${tileDescription}` : tileDescription);
+  const chipClassName =
+    tileConfig.kind === "town"
+      ? "map-chip town-chip"
+      : tileConfig.kind === "tradeCenter"
+        ? "map-chip trade-center-chip"
+        : "map-chip mine-chip";
   const className = `map-tile ${tileData.marker} ${tileConfig.kind} ${
     isSelected ? "selected" : ""
   }`;
@@ -118,7 +132,7 @@ export function MapTileComponent({
     return (
       <div
         className={`${className} map-tile-shaped`}
-        aria-label={`Map tile ${getCoordinate(tileConfig)} ${tileConfig.kind} level ${tileConfig.level}`}
+        aria-label={`Map tile ${tileDescription}`}
         title={tileTitle}
         style={{
           ...style,
@@ -143,7 +157,7 @@ export function MapTileComponent({
               onClear(tileConfig.id);
             }}
             onFocus={() => onSelect(tileConfig.id)}
-            aria-label={`Map tile ${getCoordinate(tileConfig)} ${tileConfig.kind} level ${tileConfig.level}`}
+            aria-label={`Map tile ${tileDescription}`}
             title={tileTitle}
             style={{
               gridColumn: cell.column,
@@ -164,7 +178,7 @@ export function MapTileComponent({
           </svg>
         ) : null}
         <span className={chipClassName}>
-          <span className="tile-badge-level">{tileConfig.level}</span>
+          {hasLevel ? <span className="tile-badge-level">{tileConfig.level}</span> : null}
           {occupantCode ? <span className="tile-badge-code">{occupantCode}</span> : null}
         </span>
       </div>
@@ -187,12 +201,12 @@ export function MapTileComponent({
         onClear(tileConfig.id);
       }}
       onFocus={() => onSelect(tileConfig.id)}
-      aria-label={`Map tile ${getCoordinate(tileConfig)} ${tileConfig.kind} level ${tileConfig.level}`}
+      aria-label={`Map tile ${tileDescription}`}
       title={tileTitle}
       style={style}
     >
       <span className={chipClassName}>
-        <span className="tile-badge-level">{tileConfig.level}</span>
+        {hasLevel ? <span className="tile-badge-level">{tileConfig.level}</span> : null}
         {occupantCode ? <span className="tile-badge-code">{occupantCode}</span> : null}
       </span>
     </button>

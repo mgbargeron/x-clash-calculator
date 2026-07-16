@@ -4,8 +4,8 @@ type GameMapTileConfig = {
   y: number;
   width: number;
   height: number;
-  kind: "copperMine" | "town";
-  level: number;
+  kind: "copperMine" | "town" | "tradeCenter";
+  level?: number;
   label?: string;
   shape?: string[];
 };
@@ -48,7 +48,7 @@ export const seasonTwoTiles: GameMapTileConfig[] = [
   { id: "s2-r01-c04-town", x: 12, y: 3, width: 2, height: 2, kind: "town", level: 1 },
   { id: "s2-r01-c05-town", x: 15, y: 3, width: 2, height: 2, kind: "town", level: 1 },
   { id: "s2-r01-c06-town", x: 18, y: 3, width: 2, height: 2, kind: "town", level: 1 },
-  { id: "s2-r01-c07-town", x: 21, y: 3, width: 2, height: 2, kind: "town", level: 1 },
+  { id: "s2-r01-c07-town", x: 21, y: 3, width: 2, height: 2, kind: "tradeCenter" },
   { id: "s2-r01-c08-town", x: 24, y: 3, width: 2, height: 2, kind: "town", level: 1 },
   { id: "s2-r01-c09-town", x: 27, y: 3, width: 2, height: 2, kind: "town", level: 1 },
   { id: "s2-r01-c10-town", x: 30, y: 3, width: 2, height: 2, kind: "town", level: 1 },
@@ -77,7 +77,7 @@ export const seasonTwoTiles: GameMapTileConfig[] = [
   { id: "s2-r02-c04-town", x: 12, y: 6, width: 2, height: 2, kind: "town", level: 2 },
   { id: "s2-r02-c05-town", x: 15, y: 6, width: 2, height: 2, kind: "town", level: 2 },
   { id: "s2-r02-c06-town", x: 18, y: 6, width: 2, height: 2, kind: "town", level: 2 },
-  { id: "s2-r02-c07-town", x: 21, y: 6, width: 2, height: 2, kind: "town", level: 2 },
+  { id: "s2-r02-c07-town", x: 21, y: 6, width: 2, height: 2, kind: "tradeCenter"},
   { id: "s2-r02-c08-town", x: 24, y: 6, width: 2, height: 2, kind: "town", level: 2 },
   { id: "s2-r02-c09-town", x: 27, y: 6, width: 2, height: 2, kind: "town", level: 2 },
   { id: "s2-r02-c10-town", x: 30, y: 6, width: 2, height: 2, kind: "town", level: 2 },
@@ -106,7 +106,7 @@ export const seasonTwoTiles: GameMapTileConfig[] = [
   { id: "s2-r03-c04-town", x: 12, y: 9, width: 2, height: 2, kind: "town", level: 3 },
   { id: "s2-r03-c05-town", x: 15, y: 9, width: 2, height: 2, kind: "town", level: 3 },
   { id: "s2-r03-c06-town", x: 18, y: 9, width: 2, height: 2, kind: "town", level: 3 },
-  { id: "s2-r03-c07-town", x: 21, y: 9, width: 2, height: 2, kind: "town", level: 3 },
+  { id: "s2-r03-c07-town", x: 21, y: 9, width: 2, height: 2, kind: "tradeCenter"},
   { id: "s2-r03-c08-town", x: 24, y: 9, width: 2, height: 2, kind: "town", level: 3 },
   { id: "s2-r03-c09-town", x: 27, y: 9, width: 2, height: 2, kind: "town", level: 3 },
   { id: "s2-r03-c10-town", x: 30, y: 9, width: 2, height: 2, kind: "town", level: 3 },
@@ -135,7 +135,7 @@ export const seasonTwoTiles: GameMapTileConfig[] = [
   { id: "s2-r04-c04-town", x: 12, y: 12, width: 2, height: 2, kind: "town", level: 4 },
   { id: "s2-r04-c05-town", x: 15, y: 12, width: 2, height: 2, kind: "town", level: 4 },
   { id: "s2-r04-c06-town", x: 18, y: 12, width: 2, height: 2, kind: "town", level: 4 },
-  { id: "s2-r04-c07-town", x: 21, y: 12, width: 2, height: 2, kind: "town", level: 4 },
+  { id: "s2-r04-c07-town", x: 21, y: 12, width: 2, height: 2, kind: "tradeCenter"},
   { id: "s2-r04-c08-town", x: 24, y: 12, width: 2, height: 2, kind: "town", level: 4 },
   { id: "s2-r04-c09-town", x: 27, y: 12, width: 2, height: 2, kind: "town", level: 4 },
   { id: "s2-r04-c10-town", x: 30, y: 12, width: 2, height: 2, kind: "town", level: 3 },
@@ -164,7 +164,7 @@ export const seasonTwoTiles: GameMapTileConfig[] = [
   { id: "s2-r05-c04-town", x: 12, y: 15, width: 2, height: 2, kind: "town", level: 4 },
   { id: "s2-r05-c05-town", x: 15, y: 15, width: 2, height: 2, kind: "town", level: 5 },
   { id: "s2-r05-c06-town", x: 18, y: 15, width: 2, height: 2, kind: "town", level: 5 },
-  { id: "s2-r05-c07-town", x: 21, y: 15, width: 2, height: 2, kind: "town", level: 5 },
+  { id: "s2-r05-c07-town", x: 21, y: 15, width: 2, height: 2, kind: "tradeCenter" },
   { id: "s2-r05-c08-town", x: 24, y: 15, width: 2, height: 2, kind: "town", level: 5 },
   { id: "s2-r05-c09-town", x: 27, y: 15, width: 2, height: 2, kind: "town", level: 4 },
   { id: "s2-r05-c10-town", x: 30, y: 15, width: 2, height: 2, kind: "town", level: 3 },
@@ -187,11 +187,11 @@ export const seasonTwoTiles: GameMapTileConfig[] = [
   { id: "s2-r06-c13-copper", x: 37, y: 16, width: 3, height: 3, kind: "copperMine", level: 1, label: "Copper Mine", shape: copperMineShapes.rightEdge },
 
   // Towns Row 6
-  { id: "s2-r06-c01-town", x: 3, y: 18, width: 2, height: 2, kind: "town", level: 1 },
-  { id: "s2-r06-c02-town", x: 6, y: 18, width: 2, height: 2, kind: "town", level: 2 },
-  { id: "s2-r06-c03-town", x: 9, y: 18, width: 2, height: 2, kind: "town", level: 3 },
-  { id: "s2-r06-c04-town", x: 12, y: 18, width: 2, height: 2, kind: "town", level: 4 },
-  { id: "s2-r06-c05-town", x: 15, y: 18, width: 2, height: 2, kind: "town", level: 5 },
+  { id: "s2-r06-c01-town", x: 3, y: 18, width: 2, height: 2, kind: "tradeCenter" },
+  { id: "s2-r06-c02-town", x: 6, y: 18, width: 2, height: 2, kind: "tradeCenter"},
+  { id: "s2-r06-c03-town", x: 9, y: 18, width: 2, height: 2, kind: "tradeCenter"},
+  { id: "s2-r06-c04-town", x: 12, y: 18, width: 2, height: 2, kind: "tradeCenter"},
+  { id: "s2-r06-c05-town", x: 15, y: 18, width: 2, height: 2, kind: "tradeCenter"},
   { id: "s2-r06-c06-town", x: 18, y: 18, width: 2, height: 2, kind: "town", level: 6 },
   { id: "s2-r06-c07-town", x: 21, y: 18, width: 2, height: 2, kind: "town", level: 6 },
   { id: "s2-r06-c08-town", x: 24, y: 18, width: 2, height: 2, kind: "town", level: 5 },
@@ -222,12 +222,12 @@ export const seasonTwoTiles: GameMapTileConfig[] = [
   { id: "s2-r07-c04-town", x: 12, y: 21, width: 2, height: 2, kind: "town", level: 4 },
   { id: "s2-r07-c05-town", x: 15, y: 21, width: 2, height: 2, kind: "town", level: 5 },
   { id: "s2-r07-c06-town", x: 18, y: 21, width: 2, height: 2, kind: "town", level: 6 },
-  { id: "s2-r07-c07-town", x: 21, y: 21, width: 2, height: 2, kind: "town", level: 6 },
-  { id: "s2-r07-c08-town", x: 24, y: 21, width: 2, height: 2, kind: "town", level: 5 },
-  { id: "s2-r07-c09-town", x: 27, y: 21, width: 2, height: 2, kind: "town", level: 4 },
-  { id: "s2-r07-c10-town", x: 30, y: 21, width: 2, height: 2, kind: "town", level: 3 },
-  { id: "s2-r07-c11-town", x: 33, y: 21, width: 2, height: 2, kind: "town", level: 2 },
-  { id: "s2-r07-c12-town", x: 36, y: 21, width: 2, height: 2, kind: "town", level: 1 },
+  { id: "s2-r07-c07-town", x: 21, y: 21, width: 2, height: 2, kind: "town", level: 6},
+  { id: "s2-r07-c08-town", x: 24, y: 21, width: 2, height: 2, kind: "tradeCenter"},
+  { id: "s2-r07-c09-town", x: 27, y: 21, width: 2, height: 2, kind: "tradeCenter"},
+  { id: "s2-r07-c10-town", x: 30, y: 21, width: 2, height: 2, kind: "tradeCenter"},
+  { id: "s2-r07-c11-town", x: 33, y: 21, width: 2, height: 2, kind: "tradeCenter"},
+  { id: "s2-r07-c12-town", x: 36, y: 21, width: 2, height: 2, kind: "tradeCenter"},
 
   // Mine Row 8
   { id: "s2-r08-c01-copper", x: 1, y: 22, width: 3, height: 3, kind: "copperMine", level: 1, label: "Copper Mine", shape: copperMineShapes.leftEdge },
@@ -250,7 +250,7 @@ export const seasonTwoTiles: GameMapTileConfig[] = [
   { id: "s2-r08-c03-town", x: 9, y: 24, width: 2, height: 2, kind: "town", level: 3 },
   { id: "s2-r08-c04-town", x: 12, y: 24, width: 2, height: 2, kind: "town", level: 4 },
   { id: "s2-r08-c05-town", x: 15, y: 24, width: 2, height: 2, kind: "town", level: 5 },
-  { id: "s2-r08-c06-town", x: 18, y: 24, width: 2, height: 2, kind: "town", level: 5 },
+  { id: "s2-r08-c06-town", x: 18, y: 24, width: 2, height: 2, kind: "tradeCenter" },
   { id: "s2-r08-c07-town", x: 21, y: 24, width: 2, height: 2, kind: "town", level: 5 },
   { id: "s2-r08-c08-town", x: 24, y: 24, width: 2, height: 2, kind: "town", level: 5 },
   { id: "s2-r08-c09-town", x: 27, y: 24, width: 2, height: 2, kind: "town", level: 4 },
@@ -279,7 +279,7 @@ export const seasonTwoTiles: GameMapTileConfig[] = [
   { id: "s2-r09-c03-town", x: 9, y: 27, width: 2, height: 2, kind: "town", level: 3 },
   { id: "s2-r09-c04-town", x: 12, y: 27, width: 2, height: 2, kind: "town", level: 4 },
   { id: "s2-r09-c05-town", x: 15, y: 27, width: 2, height: 2, kind: "town", level: 4 },
-  { id: "s2-r09-c06-town", x: 18, y: 27, width: 2, height: 2, kind: "town", level: 4 },
+  { id: "s2-r09-c06-town", x: 18, y: 27, width: 2, height: 2, kind: "tradeCenter"},
   { id: "s2-r09-c07-town", x: 21, y: 27, width: 2, height: 2, kind: "town", level: 4 },
   { id: "s2-r09-c08-town", x: 24, y: 27, width: 2, height: 2, kind: "town", level: 4 },
   { id: "s2-r09-c09-town", x: 27, y: 27, width: 2, height: 2, kind: "town", level: 4 },
@@ -308,7 +308,7 @@ export const seasonTwoTiles: GameMapTileConfig[] = [
   { id: "s2-r10-c03-town", x: 9, y: 30, width: 2, height: 2, kind: "town", level: 3 },
   { id: "s2-r10-c04-town", x: 12, y: 30, width: 2, height: 2, kind: "town", level: 3 },
   { id: "s2-r10-c05-town", x: 15, y: 30, width: 2, height: 2, kind: "town", level: 3 },
-  { id: "s2-r10-c06-town", x: 18, y: 30, width: 2, height: 2, kind: "town", level: 3 },
+  { id: "s2-r10-c06-town", x: 18, y: 30, width: 2, height: 2, kind: "tradeCenter"},
   { id: "s2-r10-c07-town", x: 21, y: 30, width: 2, height: 2, kind: "town", level: 3 },
   { id: "s2-r10-c08-town", x: 24, y: 30, width: 2, height: 2, kind: "town", level: 3 },
   { id: "s2-r10-c09-town", x: 27, y: 30, width: 2, height: 2, kind: "town", level: 3 },
@@ -337,7 +337,7 @@ export const seasonTwoTiles: GameMapTileConfig[] = [
   { id: "s2-r11-c03-town", x: 9, y: 33, width: 2, height: 2, kind: "town", level: 2 },
   { id: "s2-r11-c04-town", x: 12, y: 33, width: 2, height: 2, kind: "town", level: 2 },
   { id: "s2-r11-c05-town", x: 15, y: 33, width: 2, height: 2, kind: "town", level: 2 },
-  { id: "s2-r11-c06-town", x: 18, y: 33, width: 2, height: 2, kind: "town", level: 2 },
+  { id: "s2-r11-c06-town", x: 18, y: 33, width: 2, height: 2, kind: "tradeCenter"},
   { id: "s2-r11-c07-town", x: 21, y: 33, width: 2, height: 2, kind: "town", level: 2 },
   { id: "s2-r11-c08-town", x: 24, y: 33, width: 2, height: 2, kind: "town", level: 2 },
   { id: "s2-r11-c09-town", x: 27, y: 33, width: 2, height: 2, kind: "town", level: 2 },
@@ -366,7 +366,7 @@ export const seasonTwoTiles: GameMapTileConfig[] = [
   { id: "s2-r12-c03-town", x: 9, y: 36, width: 2, height: 2, kind: "town", level: 1 },
   { id: "s2-r12-c04-town", x: 12, y: 36, width: 2, height: 2, kind: "town", level: 1 },
   { id: "s2-r12-c05-town", x: 15, y: 36, width: 2, height: 2, kind: "town", level: 1 },
-  { id: "s2-r12-c06-town", x: 18, y: 36, width: 2, height: 2, kind: "town", level: 1 },
+  { id: "s2-r12-c06-town", x: 18, y: 36, width: 2, height: 2, kind: "tradeCenter"},
   { id: "s2-r12-c07-town", x: 21, y: 36, width: 2, height: 2, kind: "town", level: 1 },
   { id: "s2-r12-c08-town", x: 24, y: 36, width: 2, height: 2, kind: "town", level: 1 },
   { id: "s2-r12-c09-town", x: 27, y: 36, width: 2, height: 2, kind: "town", level: 1 },
