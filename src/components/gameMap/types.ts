@@ -69,4 +69,5 @@ export type GameMapConfig = {
   columns: number;
   rows: number;
   tiles: GameMapTileConfig[];
+  coordinateGroupSize?: number;
 };

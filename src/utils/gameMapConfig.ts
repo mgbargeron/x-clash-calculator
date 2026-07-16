@@ -26,6 +26,7 @@ export type GameMapConfig = {
   columns: number;
   rows: number;
   tiles: GameMapTileConfig[];
+  coordinateGroupSize?: number;
 };
 
 export type Season = number;
@@ -40,12 +41,14 @@ export const defaultGameMapConfig: GameMapConfig = {
   columns: 20,
   rows: 20,
   tiles: s1Tiles,
+  coordinateGroupSize: 1,
 };
 
 export const seasonTwoMapConfig: GameMapConfig = {
   columns: seasonTwoColumns,
   rows: seasonTwoRowsCount,
   tiles: s2Tiles,
+  coordinateGroupSize: 3,
 };
 
 export const allSeasonConfigs: SeasonConfig[] = [

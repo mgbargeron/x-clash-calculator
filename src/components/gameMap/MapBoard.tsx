@@ -8,6 +8,12 @@ type MapBoardFrameStyle = CSSProperties & {
   "--map-zoom": number;
 };
 
+type AxisLabel = {
+  label: string | number;
+  start: number;
+  span: number;
+};
+
 type MapBoardProps = {
   config: GameMapConfig;
   tiles: Record<string, MapTile>;
@@ -28,6 +34,46 @@ function formatTeamDisplayLabel(code: unknown, name: unknown): string {
   return `[${normalizedCode}]${normalizedName}`;
 }
 
+function getCoordinateGroupSize(config: GameMapConfig): number {
+  const configuredSize = config.coordinateGroupSize;
+
+  return typeof configuredSize === "number" && Number.isInteger(configuredSize) && configuredSize > 0
+    ? configuredSize
+    : 1;
+}
+
+function createColumnLabels(config: GameMapConfig): AxisLabel[] {
+  const groupSize = getCoordinateGroupSize(config);
+  const labelCount = Math.ceil(config.columns / groupSize);
+
+  return Array.from({ length: labelCount }, (_, index) => {
+    const start = index * groupSize + 1;
+    const span = Math.min(groupSize, config.columns - start + 1);
+
+    return {
+      label: index + 1,
+      start,
+      span,
+    };
+  });
+}
+
+function createRowLabels(config: GameMapConfig): AxisLabel[] {
+  const groupSize = getCoordinateGroupSize(config);
+  const labelCount = Math.ceil(config.rows / groupSize);
+
+  return Array.from({ length: labelCount }, (_, index) => {
+    const start = index * groupSize + 1;
+    const span = Math.min(groupSize, config.rows - start + 1);
+
+    return {
+      label: String.fromCharCode(65 + index),
+      start,
+      span,
+    };
+  });
+}
+
 export function MapBoard({
   config,
   tiles,
@@ -41,10 +87,8 @@ export function MapBoard({
   onTilePaint,
   onTileClear,
 }: MapBoardProps) {
-  const columnLabels = Array.from({ length: config.columns }, (_, index) => index + 1);
-  const rowLabels = Array.from({ length: config.rows }, (_, index) =>
-    String.fromCharCode(65 + index)
-  );
+  const columnLabels = createColumnLabels(config);
+  const rowLabels = createRowLabels(config);
 
   return (
     <div ref={boardRef} className="map-board-shell">
@@ -60,12 +104,26 @@ export function MapBoard({
           <div className="map-corner" aria-hidden="true" />
           <div className="map-column-key" aria-hidden="true">
             {columnLabels.map((column) => (
-              <span key={column}>{column}</span>
+              <span
+                key={column.label}
+                style={{
+                  gridColumn: `${column.start} / span ${column.span}`,
+                }}
+              >
+                {column.label}
+              </span>
             ))}
           </div>
           <div className="map-row-key" aria-hidden="true">
             {rowLabels.map((row) => (
-              <span key={row}>{row}</span>
+              <span
+                key={row.label}
+                style={{
+                  gridRow: `${row.start} / span ${row.span}`,
+                }}
+              >
+                {row.label}
+              </span>
             ))}
           </div>
           <div className="map-board" aria-label="Editable game map">
