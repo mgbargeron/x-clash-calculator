@@ -5,6 +5,7 @@ import CalculatorPage from "./pages/CalculatorPage";
 import HeroExpPage from "./pages/HeroExpPage";
 import GameMapPage from "./pages/GameMapPage";
 import ServerTimePage from "./pages/ServerTimePage";
+import Season2SimulatorPage from "./pages/Season2SimulatorPage";
 
 const GRID_STORAGE_KEY = "chest-grid-values-v1";
 
@@ -14,7 +15,7 @@ const DEFAULT_GRID_VALUES: string[][] = [
   ["", "", ""],
 ];
 
-type Page = "calculator" | "heroExp" | "map" | "serverTime";
+type Page = "calculator" | "heroExp" | "map" | "serverTime" | "simulator";
 
 function loadInitialGridValues(): string[][] {
   try {
@@ -87,6 +88,13 @@ export default function App() {
       >
         Server Time
       </button>
+      <button
+        className={`nav-button ${page === "simulator" ? "active" : ""}`}
+        type="button"
+        onClick={() => setPage("simulator")}
+      >
+        Dark Oil
+      </button>
     </nav>
   );
 
@@ -106,8 +114,10 @@ export default function App() {
         />
       ) : page === "map" ? (
         <GameMapPage navigation={navigation} />
-      ) : (
+      ) : page === "serverTime" ? (
         <ServerTimePage navigation={navigation} />
+      ) : (
+        <Season2SimulatorPage navigation={navigation} />
       )}
     </main>
   );
