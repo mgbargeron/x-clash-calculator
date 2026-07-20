@@ -1,133 +1,114 @@
-import CalculationTable from "./CalculationTable";
+import {useState} from "react";
+import {sanitizeNumericInput} from "./utils/sanitizeNumericInput";
+import {useGridValuesPersistence} from "./hooks/useGridValuesPersistence";
+import CalculatorPage from "./pages/CalculatorPage";
+import HeroExpPage from "./pages/HeroExpPage";
+import GameMapPage from "./pages/GameMapPage";
+import ServerTimePage from "./pages/ServerTimePage";
 
+const GRID_STORAGE_KEY = "chest-grid-values-v1";
 
-export type Row = {
-  description: string
-  value: string
-  quantity: string
-  isStatic?: boolean
+const DEFAULT_GRID_VALUES: string[][] = [
+  ["", "", ""],
+  ["", "", ""],
+  ["", "", ""],
+];
+
+type Page = "calculator" | "heroExp" | "map" | "serverTime";
+
+function loadInitialGridValues(): string[][] {
+  try {
+    const raw = window.localStorage.getItem(GRID_STORAGE_KEY);
+    if (!raw) return structuredClone(DEFAULT_GRID_VALUES);
+
+    const parsed = JSON.parse(raw);
+    const isValidShape =
+      Array.isArray(parsed) &&
+      parsed.length === 3 &&
+      parsed.every(
+        (row) =>
+          Array.isArray(row) &&
+          row.length === 3 &&
+          row.every((cell) => typeof cell === "string")
+      );
+
+    if (!isValidShape) return structuredClone(DEFAULT_GRID_VALUES);
+
+    return parsed.map((row: string[]) => row.map((cell) => sanitizeNumericInput(cell)));
+  } catch {
+    return structuredClone(DEFAULT_GRID_VALUES);
+  }
 }
 
-const WHEAT_STORAGE_KEY = 'wheat-quantity-rows'
-const IRON_STORAGE_KEY = 'iron-quantity-rows'
-const GOLD_STORAGE_KEY = 'gold-quantity-rows'
-
-
-const rssRows: Row[] = [
-  {
-    description: '1k Chest',
-    value: '1000',
-    quantity: '',
-    isStatic: true,
-  },
-  {
-    description: '10K Chest',
-    value: '10000',
-    quantity: '',
-    isStatic: true,
-  },
-  {
-    description: '50K Chest',
-    value: '50000',
-    quantity: '',
-    isStatic: true,
-  },
-  {
-    description: 'Blue Chest',
-    value: '',
-    quantity: '',
-    isStatic: false,
-  },
-  {
-    description: 'Purple Chest',
-    value: '',
-    quantity: '',
-    isStatic: false,
-  },
-  {
-    description: 'Legendary Chest',
-    value: '',
-    quantity: '',
-    isStatic: false,
-  },
-]
-
-const initialWheatRows: Row[] = structuredClone(rssRows)
-const initialIronRows: Row[] = structuredClone(rssRows)
-const initialGoldRows: Row[] = [
-  {
-    description: '600 Chest',
-    value: '600',
-    quantity: '',
-    isStatic: true,
-  },
-  {
-    description: '6k Chest',
-    value: '6000',
-    quantity: '',
-    isStatic: true,
-  },
-  {
-    description: '30k Chest',
-    value: '30000',
-    quantity: '',
-    isStatic: true,
-  },
-  {
-    description: 'Blue Chest',
-    value: '',
-    quantity: '',
-    isStatic: false,
-  },
-  {
-    description: 'Purple Chest',
-    value: '',
-    quantity: '',
-    isStatic: false,
-  },
-  {
-    description: 'Legendary Chest',
-    value: '',
-    quantity: '',
-    isStatic: false,
-  },
-]
-
-
-
 export default function App() {
+  const [page, setPage] = useState<Page>("calculator");
+  const [gridValues, setGridValues] = useState<string[][]>(() => loadInitialGridValues());
+
+  const updateGridCell = (rowIndex: number, columnIndex: number, value: string) => {
+    const sanitized = sanitizeNumericInput(value);
+    setGridValues((current) =>
+      current.map((row, rIdx) =>
+        rIdx === rowIndex
+          ? row.map((cell, cIdx) => (cIdx === columnIndex ? sanitized : cell))
+          : row
+      )
+    );
+  };
+
+  useGridValuesPersistence(gridValues);
+
+  const navigation = (
+    <nav className="app-nav" aria-label="Primary navigation">
+      <button
+        className={`nav-button ${page === "calculator" ? "active" : ""}`}
+        type="button"
+        onClick={() => setPage("calculator")}
+      >
+        Calculator
+      </button>
+      <button
+        className={`nav-button ${page === "heroExp" ? "active" : ""}`}
+        type="button"
+        onClick={() => setPage("heroExp")}
+      >
+        Hero Exp
+      </button>
+      <button
+        className={`nav-button ${page === "map" ? "active" : ""}`}
+        type="button"
+        onClick={() => setPage("map")}
+      >
+        Game Map
+      </button>
+      <button
+        className={`nav-button ${page === "serverTime" ? "active" : ""}`}
+        type="button"
+        onClick={() => setPage("serverTime")}
+      >
+        Server Time
+      </button>
+    </nav>
+  );
+
   return (
     <main className="app">
-      <section className="card calculator">
-        <p className="eyebrow">Auto total calculator</p>
-        <h1>Chest Value × Quantity</h1>
-        <p className="description">
-          Enter a value and quantity for each row. Totals update automatically.
-        </p>
-        <div className="tables-container">
-          <div className="calculator-wrapper">
-            <CalculationTable
-              initialRows={initialWheatRows}
-              resourceName="Wheat"
-              storageKey={WHEAT_STORAGE_KEY}
-            />
-          </div>
-          <div className="calculator-wrapper">
-            <CalculationTable
-              initialRows={initialIronRows}
-              resourceName={"Iron"}
-              storageKey={IRON_STORAGE_KEY}
-            />
-          </div>
-          <div className="calculator-wrapper">
-            <CalculationTable
-              initialRows={initialGoldRows}
-              resourceName={"Gold"}
-              storageKey={GOLD_STORAGE_KEY}
-            />
-          </div>
-        </div>
-      </section>
+      {page === "calculator" ? (
+        <CalculatorPage
+          gridValues={gridValues}
+          updateGridCell={updateGridCell}
+          navigation={navigation}
+        />
+      ) : page === "heroExp" ? (
+        <HeroExpPage
+          gridValues={gridValues}
+          updateGridCell={updateGridCell}
+          navigation={navigation}
+        />
+      ) : page === "map" ? (
+        <GameMapPage navigation={navigation} />
+      ) : (
+        <ServerTimePage navigation={navigation} />
+      )}
     </main>
-  )
+  );
 }
