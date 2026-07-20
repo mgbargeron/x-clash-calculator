@@ -1,4 +1,4 @@
-import {useMemo, useRef, useState, type ReactNode} from "react";
+import {useEffect, useMemo, useRef, useState, type ReactNode} from "react";
 
 import EventPlannerDialog from "../components/serverTime/EventPlannerDialog";
 import ServerWeekView from "../components/serverTime/ServerWeekView";
@@ -17,6 +17,7 @@ import {
   formatTimeInZone,
   getCurrentServerDateString,
   getCurrentServerWeekStart,
+  getCurrentServerWeekStartDateString,
   getEventScheduleSummary,
   getNextEventOccurrence,
   getResolvedAlternatingWeekState,
@@ -54,6 +55,35 @@ export default function ServerTimePage({navigation}: ServerTimePageProps) {
 
   usePlannerAlternatingWeekSync(isLoaded, now, plannerState, setPlannerState);
   useServerTimeDataSaver(plannerState, isLoaded);
+
+  const currentServerWeekStartDate = getCurrentServerWeekStartDateString(now, plannerState.settings);
+
+  useEffect(() => {
+    if (!isLoaded) return;
+
+    setPlannerState((current) => {
+      const expiredEventIds = new Set(
+        current.events
+          .filter((event) =>
+            event.type === "oneTime" &&
+            event.oneTimeServerDate !== "" &&
+            event.oneTimeServerDate < currentServerWeekStartDate
+          )
+          .map((event) => event.id)
+      );
+
+      if (expiredEventIds.size === 0) return current;
+
+      return {
+        ...current,
+        events: current.events.filter((event) => !expiredEventIds.has(event.id)),
+        acknowledgedAlarmKeys: current.acknowledgedAlarmKeys.filter((key) => {
+          const separatorIndex = key.indexOf(":");
+          return !expiredEventIds.has(separatorIndex >= 0 ? key.slice(0, separatorIndex) : key);
+        }),
+      };
+    });
+  }, [currentServerWeekStartDate, isLoaded, setPlannerState]);
 
   const localTimezone = useMemo(
     () => Intl.DateTimeFormat().resolvedOptions().timeZone || "Local",
