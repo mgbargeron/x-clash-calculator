@@ -1,5 +1,5 @@
 import type { CSSProperties, RefObject } from "react";
-import { MapTileComponent } from "./MapTile";
+import { MapTileComponent, type MapTileSimulationState } from "./MapTile";
 import type { GameMapConfig, TileMarker, MapTile } from "./types";
 
 type MapBoardFrameStyle = CSSProperties & {
@@ -21,6 +21,7 @@ type MapBoardProps = {
   ourTeam: { color: string; code: string; name: string };
   rivalTeams: Array<{ id: string; color: string; code: string; name: string }>;
   enemyTeams: Array<{ id: string; code: string; name: string }>;
+  simulationStates?: Record<string, MapTileSimulationState>;
   zoom: number;
   boardRef: RefObject<HTMLDivElement | null>;
   onTileSelect: (tileId: string) => void;
@@ -81,6 +82,7 @@ export function MapBoard({
   ourTeam,
   rivalTeams,
   enemyTeams,
+  simulationStates,
   zoom,
   boardRef,
   onTileSelect,
@@ -161,6 +163,7 @@ export function MapBoard({
                   enemyColor="#CF3F45"
                   occupantCode={occupantCode}
                   occupantLabel={occupantLabel}
+                  simulationState={simulationStates?.[tileConfig.id]}
                   onSelect={onTileSelect}
                   onPaint={onTilePaint}
                   onClear={onTileClear}

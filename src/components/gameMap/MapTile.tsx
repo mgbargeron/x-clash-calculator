@@ -3,6 +3,11 @@ import type { MapTile as MapTileType, GameMapTileConfig } from "./types";
 
 export type { MapTileType as MapTile };
 
+export type MapTileSimulationState = {
+  status: "owned" | "capturable" | "locked" | "blocked" | "unavailable";
+  description: string;
+};
+
 type MapTileStyle = CSSProperties & {
   "--base-color": string;
   "--rival-color": string;
@@ -20,6 +25,7 @@ type MapTileComponentProps = {
   enemyColor: string;
   occupantCode?: string;
   occupantLabel?: string;
+  simulationState?: MapTileSimulationState;
   onSelect: (tileId: string) => void;
   onPaint: (tileId: string) => void;
   onClear: (tileId: string) => void;
@@ -97,6 +103,7 @@ export function MapTileComponent({
   enemyColor,
   occupantCode,
   occupantLabel,
+  simulationState,
   onSelect,
   onPaint,
   onClear,
@@ -109,6 +116,7 @@ export function MapTileComponent({
   const tileDescription = getTileDescription(tileConfig);
   const hasLevel = typeof tileConfig.level === "number";
   const tileTitle =
+    simulationState?.description ||
     tileData.note ||
     (occupantLabel ? `${occupantLabel} ${tileDescription}` : tileDescription);
   const chipClassName =
@@ -119,7 +127,7 @@ export function MapTileComponent({
         : "map-chip mine-chip";
   const className = `map-tile ${tileData.marker} ${tileConfig.kind} ${
     isSelected ? "selected" : ""
-  }`;
+  } ${simulationState ? `city-race-tile city-race-tile--${simulationState.status}` : ""}`;
   const style = {
     gridColumn: `${tileConfig.x} / span ${tileWidth}`,
     gridRow: `${tileConfig.y} / span ${tileHeight}`,
@@ -133,6 +141,11 @@ export function MapTileComponent({
       <div
         className={`${className} map-tile-shaped`}
         aria-label={`Map tile ${tileDescription}`}
+        aria-disabled={
+          simulationState?.status === "locked" ||
+          simulationState?.status === "blocked" ||
+          simulationState?.status === "unavailable"
+        }
         title={tileTitle}
         style={{
           ...style,
@@ -158,6 +171,11 @@ export function MapTileComponent({
             }}
             onFocus={() => onSelect(tileConfig.id)}
             aria-label={`Map tile ${tileDescription}`}
+            aria-disabled={
+              simulationState?.status === "locked" ||
+              simulationState?.status === "blocked" ||
+              simulationState?.status === "unavailable"
+            }
             title={tileTitle}
             style={{
               gridColumn: cell.column,
@@ -202,6 +220,11 @@ export function MapTileComponent({
       }}
       onFocus={() => onSelect(tileConfig.id)}
       aria-label={`Map tile ${tileDescription}`}
+      aria-disabled={
+        simulationState?.status === "locked" ||
+        simulationState?.status === "blocked" ||
+        simulationState?.status === "unavailable"
+      }
       title={tileTitle}
       style={style}
     >

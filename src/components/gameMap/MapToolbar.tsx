@@ -15,6 +15,7 @@ type TeamItem = { code: string; name: string };
 type MapToolbarProps = {
   serverIds: string[];
   activeServerId: string;
+  simulationServerId?: string;
   canRemoveActiveServer: boolean;
   clearMarkerCount: number;
   selectedMarker: TileMarker;
@@ -46,6 +47,7 @@ function formatTeamDisplayLabel(code: unknown, name: unknown): string {
 export function MapToolbar({
   serverIds,
   activeServerId,
+  simulationServerId,
   canRemoveActiveServer,
   clearMarkerCount,
   selectedMarker,
@@ -74,6 +76,7 @@ export function MapToolbar({
   const [isAddingServer, setIsAddingServer] = useState(false);
   const [serverDraft, setServerDraft] = useState("");
   const [serverDraftInvalid, setServerDraftInvalid] = useState(false);
+  const isSimulationMode = activeServerId === simulationServerId;
 
   function submitServer() {
     const nextServerId = serverDraft.trim();
@@ -111,16 +114,24 @@ export function MapToolbar({
               key={serverId}
               className={`icon-tool-button server-tool-button ${
                 activeServerId === serverId ? "active" : ""
-              }`}
+              } ${serverId === simulationServerId ? "server-tool-button--simulation" : ""}`}
               type="button"
-              title={`Switch to server ${serverId}`}
-              aria-label={`Switch to server ${serverId}`}
-            onClick={() => onServerSelect(serverId)}
-          >
-            <span className="team-code">{serverId}</span>
-          </button>
+              title={
+                serverId === simulationServerId
+                  ? "Simulate City Race"
+                  : `Switch to server ${serverId}`
+              }
+              aria-label={
+                serverId === simulationServerId
+                  ? "Simulate City Race"
+                  : `Switch to server ${serverId}`
+              }
+              onClick={() => onServerSelect(serverId)}
+            >
+              <span className="team-code">{serverId}</span>
+            </button>
           ))}
-          {isEditingServerId ? (
+          {isEditingServerId && !isSimulationMode ? (
             <input
               className={`server-id-input server-id-input--edit ${serverEditInvalid ? "invalid" : ""}`}
               type="text"
@@ -208,7 +219,7 @@ export function MapToolbar({
               +
             </button>
           ) : null}
-          {isEditingServerId ? (
+          {isEditingServerId && !isSimulationMode ? (
             <button
               className="map-toolbar-mini-button asidetip"
               type="button"
@@ -218,7 +229,7 @@ export function MapToolbar({
             >
               #
             </button>
-          ) : (
+          ) : !isSimulationMode ? (
             <button
               className="map-toolbar-mini-button asidetip"
               type="button"
@@ -232,7 +243,7 @@ export function MapToolbar({
             >
               #
             </button>
-          )}
+          ) : null}
           <button
             className="remove-team-button asidetip"
             type="button"
@@ -246,7 +257,8 @@ export function MapToolbar({
         </div>
       </div>
 
-      <div className="map-toolbar-section tile-tools">
+      {!isSimulationMode ? (
+        <div className="map-toolbar-section tile-tools">
         {markerTools.map((tool) => (
           <button
             className={`icon-tool-button clear-tool-button ${tool.marker} ${
@@ -311,7 +323,8 @@ export function MapToolbar({
             <span className="team-code">{team.code}</span>
           </button>
         ))}
-      </div>
+        </div>
+      ) : null}
     </div>
   );
 }
