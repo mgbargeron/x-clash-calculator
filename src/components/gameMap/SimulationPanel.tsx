@@ -3,9 +3,9 @@ import type { GameMapConfig } from "../../utils/gameMapConfig";
 import {
   CITY_RACE_DAILY_MINE_LIMIT,
   CITY_RACE_DAILY_TOWN_LIMIT,
-  CITY_RACE_DEFAULT_FINAL_DAY,
   CITY_RACE_MAX_CURRENT_MINES,
   CITY_RACE_MAX_CURRENT_TOWNS,
+  CITY_RACE_MIN_FINAL_DAY,
   calculateCityRaceScoreAtDayStart,
   getCityRaceCaptureCounts,
   type CityRaceSimulation,
@@ -70,7 +70,7 @@ export function SimulationPanel({
     const parsed = Number(finalDayDraft);
     if (
       Number.isInteger(parsed) &&
-      parsed >= CITY_RACE_DEFAULT_FINAL_DAY &&
+      parsed >= CITY_RACE_MIN_FINAL_DAY &&
       parsed >= simulation.currentDay
     ) {
       onFinalDayChange(parsed);
@@ -98,7 +98,10 @@ export function SimulationPanel({
     <aside className="map-score-panel city-race-panel" aria-label="City Race simulation">
       <div className="city-race-panel-heading">
         <div>
-          <span>City Race simulation</span>
+          <div className="city-race-title-row">
+            <span>City Race simulation</span>
+            <small className="city-race-beta-badge">Beta</small>
+          </div>
           <strong>Day {simulation.currentDay} · 00:00 score</strong>
         </div>
         <button
@@ -131,7 +134,7 @@ export function SimulationPanel({
           <span>Final score day</span>
           <input
             type="number"
-            min={CITY_RACE_DEFAULT_FINAL_DAY}
+            min={CITY_RACE_MIN_FINAL_DAY}
             step={1}
             inputMode="numeric"
             value={finalDayDraft}
@@ -183,6 +186,10 @@ export function SimulationPanel({
             {simulation.currentMines.length}/{CITY_RACE_MAX_CURRENT_MINES}
           </strong>
         </span>
+        <span>
+          Trade Centers held
+          <strong>{simulation.currentTradeCenters.length} · No cap</strong>
+        </span>
       </div>
 
       {notice ? (
@@ -214,7 +221,7 @@ export function SimulationPanel({
               <span>
                 {capture.captureTime} → {capture.releaseTime ?? "Held"}
               </span>
-              {capture.kind === "copperMine" ? (
+              {capture.kind !== "town" ? (
                 <small>No Dark Oil production</small>
               ) : capture.firstCaptureBonus !== null ? (
                 <small>First capture: +{formatNumber(capture.firstCaptureBonus)}</small>

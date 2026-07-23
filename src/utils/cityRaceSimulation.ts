@@ -1,29 +1,16 @@
 import type { GameMapConfig, GameMapTileConfig } from "./gameMapConfig";
+import { CITY_RACE_SETTINGS } from "./simulationSetting";
 
-export const CITY_RACE_SERVER_ID = "SIM";
-export const CITY_RACE_DEFAULT_FINAL_DAY = 20;
-export const CITY_RACE_MAX_CURRENT_TOWNS = 8;
-export const CITY_RACE_MAX_CURRENT_MINES = 8;
-export const CITY_RACE_DAILY_TOWN_LIMIT = 2;
-export const CITY_RACE_DAILY_MINE_LIMIT = 2;
-
-export const CITY_RACE_PRODUCTION_PER_HOUR = {
-  1: 100,
-  2: 200,
-  3: 300,
-  4: 400,
-  5: 500,
-  6: 600,
-} as const;
-
-export const CITY_RACE_TOWN_UNLOCK_DAY = {
-  1: 1,
-  2: 5,
-  3: 8,
-  4: 12,
-  5: 15,
-  6: 19,
-} as const;
+export const CITY_RACE_SERVER_ID = CITY_RACE_SETTINGS.serverId;
+export const CITY_RACE_MIN_FINAL_DAY = CITY_RACE_SETTINGS.timeline.minimumDays;
+export const CITY_RACE_DEFAULT_FINAL_DAY = CITY_RACE_SETTINGS.timeline.defaultDays;
+export const CITY_RACE_TRADE_CENTER_UNLOCK_DAY = CITY_RACE_SETTINGS.tradeCenterUnlockDay;
+export const CITY_RACE_MAX_CURRENT_TOWNS = CITY_RACE_SETTINGS.captureLimits.maximumTownsHeld;
+export const CITY_RACE_MAX_CURRENT_MINES = CITY_RACE_SETTINGS.captureLimits.maximumMinesHeld;
+export const CITY_RACE_DAILY_TOWN_LIMIT = CITY_RACE_SETTINGS.captureLimits.townsPerDay;
+export const CITY_RACE_DAILY_MINE_LIMIT = CITY_RACE_SETTINGS.captureLimits.minesPerDay;
+export const CITY_RACE_PRODUCTION_PER_HOUR = CITY_RACE_SETTINGS.darkOilPerHourByTownLevel;
+export const CITY_RACE_TOWN_UNLOCK_DAY = CITY_RACE_SETTINGS.townUnlockDayByLevel;
 
 export type CityRaceTileKind = "copperMine" | "town" | "tradeCenter";
 
@@ -37,9 +24,11 @@ export type CityRaceCapture = {
 };
 
 export type CityRaceSimulation = {
+  timelineVersion: 3;
   totalCaptures: CityRaceCapture[];
   currentTowns: string[];
   currentMines: string[];
+  currentTradeCenters: string[];
   currentDay: number;
   finalDay: number;
   captureTime: string;
@@ -165,7 +154,11 @@ function isEdgeTile(tile: GameMapTileConfig, mapConfig: GameMapConfig): boolean 
 }
 
 function isOwned(state: CityRaceSimulation, tileId: string): boolean {
-  return state.currentTowns.includes(tileId) || state.currentMines.includes(tileId);
+  return (
+    state.currentTowns.includes(tileId) ||
+    state.currentMines.includes(tileId) ||
+    state.currentTradeCenters.includes(tileId)
+  );
 }
 
 function isConnectedToOwnedTile(
@@ -173,16 +166,18 @@ function isConnectedToOwnedTile(
   tile: GameMapTileConfig,
   mapConfig: GameMapConfig
 ): boolean {
-  const ownedIds = new Set([...state.currentTowns, ...state.currentMines]);
+  const ownedIds = new Set([
+    ...state.currentTowns,
+    ...state.currentMines,
+    ...state.currentTradeCenters,
+  ]);
   return mapConfig.tiles.some(
     (candidate) => ownedIds.has(candidate.id) && tilesTouch(tile, candidate)
   );
 }
 
 function getFirstCaptureBonus(_tile: GameMapTileConfig): number {
-  // Bonus values were not supplied. Keeping this as a number preserves first-capture
-  // semantics and provides one place to add the real values when they are known.
-  return 0;
+  return CITY_RACE_SETTINGS.initialTownCaptureBonus;
 }
 
 function validateActionTime(state: CityRaceSimulation): string | null {
@@ -207,9 +202,11 @@ function getTownUnlockDay(level: number): number | null {
 
 export function createDefaultCityRaceSimulation(): CityRaceSimulation {
   return {
+    timelineVersion: 3,
     totalCaptures: [],
     currentTowns: [],
     currentMines: [],
+    currentTradeCenters: [],
     currentDay: 1,
     finalDay: CITY_RACE_DEFAULT_FINAL_DAY,
     captureTime: "00:00",
@@ -223,11 +220,20 @@ export function normalizeCityRaceSimulation(
   if (!raw || typeof raw !== "object") return createDefaultCityRaceSimulation();
 
   const stored = raw as Partial<CityRaceSimulation>;
-  const finalDay = normalizeInteger(
+  const requestedFinalDay = normalizeInteger(
     stored.finalDay,
     CITY_RACE_DEFAULT_FINAL_DAY,
-    CITY_RACE_DEFAULT_FINAL_DAY
+    CITY_RACE_MIN_FINAL_DAY
   );
+  // Earlier simulation defaults ended at Day 20 and Day 35. Upgrade those
+  // defaults to the current full City Race duration.
+  const finalDay =
+    stored.timelineVersion !== 3 &&
+    CITY_RACE_SETTINGS.timeline.legacyDefaultDays.some(
+      (day) => day === requestedFinalDay
+    )
+      ? CITY_RACE_DEFAULT_FINAL_DAY
+      : requestedFinalDay;
   const requestedCurrentDay = Math.min(
     normalizeInteger(stored.currentDay, 1, 1),
     finalDay
@@ -247,7 +253,7 @@ export function normalizeCityRaceSimulation(
     if (!candidate || typeof candidate !== "object") continue;
     const capture = candidate as Partial<CityRaceCapture>;
     const tile = typeof capture.tileId === "string" ? tilesById.get(capture.tileId) : undefined;
-    if (!tile || !isCityRaceTileKind(tile.kind) || tile.kind === "tradeCenter") continue;
+    if (!tile || !isCityRaceTileKind(tile.kind)) continue;
     if (capture.kind !== tile.kind || openTileIds.has(tile.id)) continue;
 
     const parsedCaptureTime = parseTimestamp(capture.captureTime);
@@ -313,6 +319,7 @@ export function normalizeCityRaceSimulation(
   );
 
   return {
+    timelineVersion: 3,
     totalCaptures: captures,
     currentTowns: captures
       .filter((capture) => capture.kind === "town" && capture.releaseTime === null)
@@ -322,6 +329,11 @@ export function normalizeCityRaceSimulation(
       .filter((capture) => capture.kind === "copperMine" && capture.releaseTime === null)
       .map((capture) => capture.tileId)
       .slice(0, CITY_RACE_MAX_CURRENT_MINES),
+    currentTradeCenters: captures
+      .filter(
+        (capture) => capture.kind === "tradeCenter" && capture.releaseTime === null
+      )
+      .map((capture) => capture.tileId),
     currentDay,
     finalDay,
     captureTime,
@@ -352,10 +364,7 @@ export function getCityRaceCaptureError(
   tile: GameMapTileConfig,
   mapConfig: GameMapConfig
 ): string | null {
-  if (tile.kind === "tradeCenter") {
-    return "Trade Centers are not capture targets in this simulation.";
-  }
-  if (tile.kind !== "town" && tile.kind !== "copperMine") {
+  if (!isCityRaceTileKind(tile.kind)) {
     return "This tile cannot be captured in City Race.";
   }
   if (isOwned(state, tile.id)) {
@@ -391,7 +400,18 @@ export function getCityRaceCaptureError(
     }
   }
 
-  const hasOwnedTiles = state.currentTowns.length + state.currentMines.length > 0;
+  if (
+    tile.kind === "tradeCenter" &&
+    state.currentDay < CITY_RACE_TRADE_CENTER_UNLOCK_DAY
+  ) {
+    return `Trade Centers unlock on Day ${CITY_RACE_TRADE_CENTER_UNLOCK_DAY}.`;
+  }
+
+  const hasOwnedTiles =
+    state.currentTowns.length +
+      state.currentMines.length +
+      state.currentTradeCenters.length >
+    0;
   if (!hasOwnedTiles) {
     if (
       tile.kind !== "copperMine" ||
@@ -413,7 +433,12 @@ export function getCityRaceTileStatus(
   mapConfig: GameMapConfig
 ): CityRaceTileStatus {
   if (isOwned(state, tile.id)) return "owned";
-  if (tile.kind === "tradeCenter") return "unavailable";
+  if (
+    tile.kind === "tradeCenter" &&
+    state.currentDay < CITY_RACE_TRADE_CENTER_UNLOCK_DAY
+  ) {
+    return "locked";
+  }
   if (tile.kind === "town") {
     const unlockDay = getTownUnlockDay(getTileLevel(tile));
     if (unlockDay === null || state.currentDay < unlockDay) return "locked";
@@ -427,7 +452,7 @@ export function captureCityRaceTile(
   mapConfig: GameMapConfig
 ): CityRaceActionResult {
   const error = getCityRaceCaptureError(state, tile, mapConfig);
-  if (error || (tile.kind !== "town" && tile.kind !== "copperMine")) {
+  if (error || !isCityRaceTileKind(tile.kind)) {
     return { state, error: error ?? "This tile cannot be captured." };
   }
 
@@ -455,6 +480,10 @@ export function captureCityRaceTile(
         tile.kind === "copperMine"
           ? [...state.currentMines, tile.id]
           : state.currentMines,
+      currentTradeCenters:
+        tile.kind === "tradeCenter"
+          ? [...state.currentTradeCenters, tile.id]
+          : state.currentTradeCenters,
     },
   };
 }
@@ -491,6 +520,9 @@ export function releaseCityRaceTile(
       totalCaptures,
       currentTowns: state.currentTowns.filter((tileId) => tileId !== tile.id),
       currentMines: state.currentMines.filter((tileId) => tileId !== tile.id),
+      currentTradeCenters: state.currentTradeCenters.filter(
+        (tileId) => tileId !== tile.id
+      ),
     },
   };
 }
@@ -593,6 +625,12 @@ export function resetCityRaceDay(
           capture.kind === "copperMine" && capture.releaseTime === null
       )
       .map((capture) => capture.tileId),
+    currentTradeCenters: totalCaptures
+      .filter(
+        (capture) =>
+          capture.kind === "tradeCenter" && capture.releaseTime === null
+      )
+      .map((capture) => capture.tileId),
     captureTime: "00:00",
   };
 }
@@ -604,7 +642,7 @@ export function setCityRaceFinalDay(
   const normalizedFinalDay = normalizeInteger(
     finalDay,
     state.finalDay,
-    CITY_RACE_DEFAULT_FINAL_DAY
+    CITY_RACE_MIN_FINAL_DAY
   );
   return {
     ...state,

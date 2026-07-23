@@ -302,6 +302,7 @@ function createSimulationTiles(
   const ownedTileIds = new Set([
     ...simulation.currentTowns,
     ...simulation.currentMines,
+    ...simulation.currentTradeCenters,
   ]);
 
   return mapConfig.tiles.reduce<MapTilesById>((nextTiles, tileConfig) => {
@@ -1178,7 +1179,8 @@ export default function GameMapPage({ navigation }: GameMapPageProps) {
     } else {
       const isOwned =
         currentSimulation.currentTowns.includes(tileId) ||
-        currentSimulation.currentMines.includes(tileId);
+        currentSimulation.currentMines.includes(tileId) ||
+        currentSimulation.currentTradeCenters.includes(tileId);
       if (!isOwned) {
         patchActiveSnapshot({ selectedTileId: tileId });
         setSimulationNotice({
@@ -1240,7 +1242,11 @@ export default function GameMapPage({ navigation }: GameMapPageProps) {
       createSimulationSnapshot(snapshot, result.state, tileConfig.id)
     );
     const tileName =
-      tileConfig.kind === "copperMine" ? "Copper Mine" : "Town";
+      tileConfig.kind === "copperMine"
+        ? "Copper Mine"
+        : tileConfig.kind === "town"
+          ? "Town"
+          : "Trade Center";
     const actionText =
       pendingSimulationAction.action === "capture" ? "captured" : "dropped";
     setSimulationNotice({
@@ -1257,7 +1263,8 @@ export default function GameMapPage({ navigation }: GameMapPageProps) {
         current.simulation ?? createDefaultCityRaceSimulation();
       const isOwned =
         currentSimulation.currentTowns.includes(tileId) ||
-        currentSimulation.currentMines.includes(tileId);
+        currentSimulation.currentMines.includes(tileId) ||
+        currentSimulation.currentTradeCenters.includes(tileId);
       openSimulationTimeDialog(isOwned ? "release" : "capture", tileId);
       return;
     }
