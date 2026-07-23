@@ -15,6 +15,7 @@ type TeamItem = { code: string; name: string };
 type MapToolbarProps = {
   serverIds: string[];
   activeServerId: string;
+  activeServerNumber: string;
   simulationServerId?: string;
   canRemoveActiveServer: boolean;
   clearMarkerCount: number;
@@ -28,6 +29,8 @@ type MapToolbarProps = {
   onServerAdd: (id: string) => boolean;
   onActiveServerRename: (id: string) => boolean;
   onActiveServerRemove: () => void;
+  onCaptureImport: () => void;
+  onCaptureExport: () => void;
   onMarkerChange: (marker: TileMarker) => void;
   onRivalSelect: (id: string) => void;
   onEnemySelect: (id: string) => void;
@@ -47,6 +50,7 @@ function formatTeamDisplayLabel(code: unknown, name: unknown): string {
 export function MapToolbar({
   serverIds,
   activeServerId,
+  activeServerNumber,
   simulationServerId,
   canRemoveActiveServer,
   clearMarkerCount,
@@ -60,6 +64,8 @@ export function MapToolbar({
   onServerAdd,
   onActiveServerRename,
   onActiveServerRemove,
+  onCaptureImport,
+  onCaptureExport,
   onMarkerChange,
   onRivalSelect,
   onEnemySelect,
@@ -71,7 +77,7 @@ export function MapToolbar({
     setServerEditDraft,
     setServerEditInvalid,
     setIsEditingServerId,
-  } = useMapToolbarServerControls(activeServerId);
+  } = useMapToolbarServerControls(activeServerNumber);
 
   const [isAddingServer, setIsAddingServer] = useState(false);
   const [serverDraft, setServerDraft] = useState("");
@@ -139,15 +145,15 @@ export function MapToolbar({
               maxLength={3}
               inputMode="numeric"
               pattern="[0-9]{3}"
-              placeholder={activeServerId}
-              aria-label={`Edit active server number ${activeServerId}`}
+              placeholder={activeServerNumber}
+              aria-label={`Edit active server number ${activeServerNumber}`}
               aria-invalid={serverEditInvalid}
               onChange={(event) => {
                 setServerEditDraft(event.target.value.replace(/\D/g, "").slice(0, 3));
                 setServerEditInvalid(false);
               }}
               onBlur={() => {
-                if (serverEditDraft === activeServerId) {
+                if (serverEditDraft === activeServerNumber) {
                   setIsEditingServerId(false);
                   return;
                 }
@@ -160,7 +166,7 @@ export function MapToolbar({
                 }
 
                 if (event.key === "Escape") {
-                  setServerEditDraft(activeServerId);
+                  setServerEditDraft(activeServerNumber);
                   setServerEditInvalid(false);
                   setIsEditingServerId(false);
                 }
@@ -234,9 +240,9 @@ export function MapToolbar({
               className="map-toolbar-mini-button asidetip"
               type="button"
               data-tip="Edit active server number"
-              aria-label={`Edit server number ${activeServerId}`}
+              aria-label={`Edit server number ${activeServerNumber}`}
               onClick={() => {
-                setServerEditDraft(activeServerId);
+                setServerEditDraft(activeServerNumber);
                 setServerEditInvalid(false);
                 setIsEditingServerId(true);
               }}
@@ -254,6 +260,24 @@ export function MapToolbar({
           >
             ×
           </button>
+          <div className="map-capture-actions" aria-label="Map capture file actions">
+            <button
+              className="secondary-button map-capture-button"
+              type="button"
+              onClick={onCaptureImport}
+            >
+              Import
+            </button>
+            <button
+              className="secondary-button map-capture-button"
+              type="button"
+              disabled={isSimulationMode}
+              title={isSimulationMode ? "Select a numbered server version to export" : undefined}
+              onClick={onCaptureExport}
+            >
+              Export
+            </button>
+          </div>
         </div>
       </div>
 

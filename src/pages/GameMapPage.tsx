@@ -1,6 +1,16 @@
-import {useEffect, useEffectEvent, useMemo, useRef, useState, type CSSProperties, type ReactNode} from "react";
+import {
+  useEffect,
+  useEffectEvent,
+  useMemo,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type CSSProperties,
+  type ReactNode,
+} from "react";
 
 import {
+  MapCaptureImportDialog,
   MapBoard,
   MapToolbar,
   ScorePanel,
@@ -26,7 +36,13 @@ import { useUndoKeyboardShortcut } from "../hooks/useUndoKeyboardShortcut";
 import { useBeforeUnloadSave } from "../hooks/useBeforeUnloadSave";
 import { useMapStoreRefSync } from "../hooks/useMapStoreRefSync";
 import { useMapStoreSaver } from "../hooks/useMapStoreSaver";
-import { getNextSeason, getSeasonConfig, getSeasonConfigEntry, normalizeSeason } from "../utils/gameMapConfig";
+import {
+  getNextSeason,
+  getSeasonConfig,
+  getSeasonConfigEntry,
+  isConfiguredSeason,
+  normalizeSeason,
+} from "../utils/gameMapConfig";
 import type { Season, GameMapConfig } from "../utils/gameMapConfig";
 import {
   CITY_RACE_SERVER_ID,
@@ -48,7 +64,11 @@ const MAP_STORAGE_KEY = "game-map-season";
 const LEGACY_SEASON_MAP_STORAGE_KEY = "game-map-v2";
 const LEGACY_MAP_STORAGE_KEY = "game-map-v1";
 const SEASON_STORAGE_KEY = "game-map-season";
-const DEFAULT_SERVER_ID = "001";
+const DEFAULT_SERVER_NUMBER = "001";
+const DEFAULT_SERVER_ID = "001-1";
+const MAP_CAPTURE_FORMAT = "x-clash-game-map-capture";
+const MAP_CAPTURE_FORMAT_VERSION = 1;
+const MAX_MAP_CAPTURE_FILE_BYTES = 5 * 1024 * 1024;
 const MAX_ACTION_HISTORY = 10;
 const MIN_MAP_ZOOM = 0.25;
 const MAX_MAP_ZOOM = 2;
@@ -84,6 +104,20 @@ type StoredTile = {
   rivalTeamId?: unknown;
   enemyTeamId?: unknown;
   note?: unknown;
+};
+type StoredMapCaptureFile = {
+  format?: unknown;
+  formatVersion?: unknown;
+  season?: unknown;
+  seasonName?: unknown;
+  serverNumber?: unknown;
+  version?: unknown;
+  exportedAt?: unknown;
+  capture?: unknown;
+};
+type ServerVersionIdentity = {
+  serverNumber: string;
+  version: number;
 };
 
 function createSeasonStorageKey(season: Season): string {
@@ -142,14 +176,65 @@ function syncGeneratedCode(currentCode: string, previousName: string, nextName: 
   return currentCode;
 }
 
-function isValidServerId(value: string): value is ServerId {
+function isValidServerNumber(value: string): boolean {
   return /^\d{3}$/.test(value);
 }
 
-function normalizeServerId(value: unknown): ServerId | null {
+function normalizeServerNumber(value: unknown): string | null {
   if (typeof value !== "string") return null;
   const trimmed = value.trim();
-  return isValidServerId(trimmed) ? trimmed : null;
+  return isValidServerNumber(trimmed) ? trimmed : null;
+}
+
+function createServerVersionId(serverNumber: string, version: number): ServerId {
+  return `${serverNumber}-${version}`;
+}
+
+function parseServerVersionId(value: unknown): ServerVersionIdentity | null {
+  if (typeof value !== "string") return null;
+
+  const trimmed = value.trim();
+  const legacyServerNumber = normalizeServerNumber(trimmed);
+  if (legacyServerNumber) {
+    return { serverNumber: legacyServerNumber, version: 1 };
+  }
+
+  const match = /^(\d{3})-([1-9]\d*)$/.exec(trimmed);
+  if (!match) return null;
+
+  const version = Number(match[2]);
+  if (!Number.isSafeInteger(version)) return null;
+
+  return {
+    serverNumber: match[1],
+    version,
+  };
+}
+
+function normalizeServerId(value: unknown): ServerId | null {
+  const identity = parseServerVersionId(value);
+  return identity
+    ? createServerVersionId(identity.serverNumber, identity.version)
+    : null;
+}
+
+function createSeasonFileToken(season: Season): string {
+  return `Season${season}`;
+}
+
+function parseMapCaptureFilename(
+  fileName: string
+): { serverNumber: string; season: Season } | null {
+  const match = /^(\d{3})-Season([1-9]\d*)[^/]*\.json$/i.exec(fileName.trim());
+  if (!match) return null;
+
+  const season = Number(match[2]);
+  if (!isConfiguredSeason(season)) return null;
+
+  return {
+    serverNumber: match[1],
+    season,
+  };
 }
 
 function parseStoredPayload(raw: unknown): unknown {
@@ -384,10 +469,14 @@ function normalizeStoredMapStore(
       const serverId = normalizeServerId(candidate);
       if (!serverId || normalizedOrder.includes(serverId)) continue;
 
+      const rawKey = typeof candidate === "string" ? candidate : "";
+      const rawSnapshots = serversByIdRaw as Record<string, unknown>;
       const rawSnapshot =
-        serverId in (serversByIdRaw as Record<string, unknown>)
-          ? (serversByIdRaw as Record<string, unknown>)[serverId]
-          : undefined;
+        rawKey in rawSnapshots
+          ? rawSnapshots[rawKey]
+          : serverId in rawSnapshots
+            ? rawSnapshots[serverId]
+            : undefined;
 
       normalizedOrder.push(serverId);
       normalizedServersById[serverId] = normalizeStoredSnapshot(rawSnapshot, mapConfig, firstTileId);
@@ -422,12 +511,13 @@ function normalizeStoredMapStore(
       );
     }
 
+    const requestedActiveServerId = normalizeServerId(stored.activeServerId);
     const normalizedActiveServerId =
       season === 2 && stored.activeServerId === CITY_RACE_SERVER_ID
         ? CITY_RACE_SERVER_ID
-        : normalizeServerId(stored.activeServerId) && normalizedServersById[normalizeServerId(stored.activeServerId)!]
-        ? normalizeServerId(stored.activeServerId)!
-        : normalizedOrder[0];
+        : requestedActiveServerId && normalizedServersById[requestedActiveServerId]
+          ? requestedActiveServerId
+          : normalizedOrder[0];
 
     return {
       activeServerId: normalizedActiveServerId,
@@ -543,6 +633,27 @@ function replaceActiveServerSnapshot(
   };
 }
 
+function getNextAvailableServerVersion(
+  store: MultiServerMapStore,
+  serverNumber: string,
+  preferredVersion: number
+): number {
+  const usedVersions = new Set(
+    store.serverOrder.flatMap((serverId) => {
+      const identity = parseServerVersionId(serverId);
+      return identity?.serverNumber === serverNumber ? [identity.version] : [];
+    })
+  );
+
+  if (!usedVersions.has(preferredVersion)) return preferredVersion;
+
+  let version = Math.max(preferredVersion, ...usedVersions) + 1;
+  while (usedVersions.has(version)) {
+    version += 1;
+  }
+  return version;
+}
+
 type GameMapPageProps = { navigation: ReactNode };
 type SimulationNotice = {
   tone: "info" | "error" | "success";
@@ -552,6 +663,17 @@ type PendingSimulationAction = {
   action: "capture" | "release";
   tileId: string;
   time: string;
+};
+type MapCaptureNotice = {
+  tone: "error" | "success";
+  text: string;
+} | null;
+type PendingMapCaptureImport = {
+  fileName: string;
+  serverNumber: string;
+  sourceVersion: number;
+  targetVersion: number;
+  snapshot: GameMapSnapshot;
 };
 
 export default function GameMapPage({ navigation }: GameMapPageProps) {
@@ -570,6 +692,7 @@ export default function GameMapPage({ navigation }: GameMapPageProps) {
   useSeasonPersistence(activeSeason);
 
   const boardRef = useRef<HTMLDivElement | null>(null);
+  const captureFileInputRef = useRef<HTMLInputElement | null>(null);
   const hasLoadedStoredMap = useRef(false);
   const [mapStore, setMapStore] = useState<MultiServerMapStore>(() =>
     createDefaultMapStore(mapConfig, firstTileId, activeSeason)
@@ -590,8 +713,12 @@ export default function GameMapPage({ navigation }: GameMapPageProps) {
   const [simulationDialogError, setSimulationDialogError] = useState<string | null>(
     null
   );
+  const [captureNotice, setCaptureNotice] = useState<MapCaptureNotice>(null);
+  const [pendingCaptureImport, setPendingCaptureImport] =
+    useState<PendingMapCaptureImport | null>(null);
 
   const activeServerSnapshot = mapStore.serversById[mapStore.activeServerId];
+  const activeServerIdentity = parseServerVersionId(mapStore.activeServerId);
   const isSimulationMode =
     activeSeason === 2 && mapStore.activeServerId === CITY_RACE_SERVER_ID;
   const simulation =
@@ -697,7 +824,12 @@ export default function GameMapPage({ navigation }: GameMapPageProps) {
     setSimulationNotice(null);
     setPendingSimulationAction(null);
     setSimulationDialogError(null);
+    setPendingCaptureImport(null);
   }, [activeSeason, mapStore.activeServerId]);
+
+  useEffect(() => {
+    setCaptureNotice(null);
+  }, [activeSeason]);
 
   useMapStoreRefSync(latestStoreRef, latestSnapshotRef, mapStore, activeServerSnapshot);
 
@@ -735,8 +867,10 @@ export default function GameMapPage({ navigation }: GameMapPageProps) {
     () =>
       isSimulationMode
         ? "Simulate City Race"
-        : `Server ${mapStore.activeServerId}`,
-    [isSimulationMode, mapStore.activeServerId]
+        : `Server ${activeServerIdentity?.serverNumber ?? mapStore.activeServerId} · Version ${
+            activeServerIdentity?.version ?? 1
+          }`,
+    [activeServerIdentity, isSimulationMode, mapStore.activeServerId]
   );
   const simulationStates = useMemo<Record<string, MapTileSimulationState> | undefined>(() => {
     if (!isSimulationMode) return undefined;
@@ -1184,6 +1318,246 @@ export default function GameMapPage({ navigation }: GameMapPageProps) {
     });
   }
 
+  function openCaptureFilePicker() {
+    const input = captureFileInputRef.current;
+    if (!input) return;
+
+    input.value = "";
+    input.click();
+  }
+
+  async function handleCaptureFileChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    setPendingCaptureImport(null);
+    setCaptureNotice(null);
+
+    if (file.size > MAX_MAP_CAPTURE_FILE_BYTES) {
+      setCaptureNotice({
+        tone: "error",
+        text: `${file.name} is too large to be a map capture file.`,
+      });
+      return;
+    }
+
+    const filenameMetadata = parseMapCaptureFilename(file.name);
+    if (!filenameMetadata) {
+      setCaptureNotice({
+        tone: "error",
+        text: `Use a capture filename like ${DEFAULT_SERVER_NUMBER}-${createSeasonFileToken(
+          activeSeason
+        )}-v1.json.`,
+      });
+      return;
+    }
+
+    if (filenameMetadata.season !== activeSeason) {
+      setCaptureNotice({
+        tone: "error",
+        text: `${file.name} belongs to ${getSeasonConfigEntry(
+          filenameMetadata.season
+        ).label}. Switch to that season before importing it.`,
+      });
+      return;
+    }
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(await file.text());
+    } catch {
+      setCaptureNotice({
+        tone: "error",
+        text: `${file.name} is not valid JSON.`,
+      });
+      return;
+    }
+
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      setCaptureNotice({
+        tone: "error",
+        text: `${file.name} is not a game map capture file.`,
+      });
+      return;
+    }
+
+    const stored = parsed as StoredMapCaptureFile;
+    const fileSeason =
+      typeof stored.season === "number" && isConfiguredSeason(stored.season)
+        ? stored.season
+        : null;
+    const serverNumber = normalizeServerNumber(stored.serverNumber);
+    const sourceVersion =
+      typeof stored.version === "number" &&
+      Number.isSafeInteger(stored.version) &&
+      stored.version >= 1
+        ? stored.version
+        : null;
+    const hasCapture =
+      Boolean(stored.capture) &&
+      typeof stored.capture === "object" &&
+      !Array.isArray(stored.capture);
+
+    if (
+      stored.format !== MAP_CAPTURE_FORMAT ||
+      stored.formatVersion !== MAP_CAPTURE_FORMAT_VERSION ||
+      !fileSeason ||
+      !serverNumber ||
+      !sourceVersion ||
+      !hasCapture
+    ) {
+      setCaptureNotice({
+        tone: "error",
+        text: `${file.name} is not a supported game map capture file.`,
+      });
+      return;
+    }
+
+    if (fileSeason !== activeSeason || filenameMetadata.season !== fileSeason) {
+      setCaptureNotice({
+        tone: "error",
+        text: `The filename and capture data must both identify ${activeSeasonLabel}.`,
+      });
+      return;
+    }
+
+    if (filenameMetadata.serverNumber !== serverNumber) {
+      setCaptureNotice({
+        tone: "error",
+        text: "The server number in the filename does not match the capture data.",
+      });
+      return;
+    }
+
+    const targetVersion = getNextAvailableServerVersion(
+      latestStoreRef.current,
+      serverNumber,
+      sourceVersion
+    );
+    setPendingCaptureImport({
+      fileName: file.name,
+      serverNumber,
+      sourceVersion,
+      targetVersion,
+      snapshot: normalizeStoredSnapshot(stored.capture, mapConfig, firstTileId),
+    });
+  }
+
+  function exportActiveCapture() {
+    const currentStore = latestStoreRef.current;
+    const identity = parseServerVersionId(currentStore.activeServerId);
+    const snapshot = currentStore.serversById[currentStore.activeServerId];
+
+    if (!identity || !snapshot) {
+      setCaptureNotice({
+        tone: "error",
+        text: "Select a numbered server version before exporting.",
+      });
+      return;
+    }
+
+    const fileName = `${identity.serverNumber}-${createSeasonFileToken(
+      activeSeason
+    )}-v${identity.version}.json`;
+    const payload = {
+      format: MAP_CAPTURE_FORMAT,
+      formatVersion: MAP_CAPTURE_FORMAT_VERSION,
+      season: activeSeason,
+      seasonName: activeSeasonLabel,
+      serverNumber: identity.serverNumber,
+      version: identity.version,
+      exportedAt: new Date().toISOString(),
+      capture: snapshot,
+    };
+
+    const url = URL.createObjectURL(
+      new Blob([JSON.stringify(payload, null, 2)], {
+        type: "application/json",
+      })
+    );
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = fileName;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
+
+    setCaptureNotice({
+      tone: "success",
+      text: `Exported ${fileName}.`,
+    });
+  }
+
+  function importPendingCaptureAsVersion() {
+    const pending = pendingCaptureImport;
+    if (!pending) return;
+
+    const currentStore = latestStoreRef.current;
+    const targetVersion = getNextAvailableServerVersion(
+      currentStore,
+      pending.serverNumber,
+      pending.targetVersion
+    );
+    const targetServerId = createServerVersionId(
+      pending.serverNumber,
+      targetVersion
+    );
+    const hasSimulationServer =
+      CITY_RACE_SERVER_ID in currentStore.serversById;
+    const normalServerOrder = currentStore.serverOrder.filter(
+      (serverId) => serverId !== CITY_RACE_SERVER_ID
+    );
+
+    applyMapStore({
+      activeServerId: targetServerId,
+      serverOrder: hasSimulationServer
+        ? [...normalServerOrder, targetServerId, CITY_RACE_SERVER_ID]
+        : [...normalServerOrder, targetServerId],
+      serversById: {
+        ...currentStore.serversById,
+        [targetServerId]: pending.snapshot,
+      },
+    });
+    clearUndoHistory();
+    setPendingCaptureImport(null);
+    setCaptureNotice({
+      tone: "success",
+      text: `Imported ${pending.fileName} as ${targetServerId}.`,
+    });
+  }
+
+  function replaceActiveVersionWithPendingCapture() {
+    const pending = pendingCaptureImport;
+    if (!pending) return;
+
+    const currentStore = latestStoreRef.current;
+    const identity = parseServerVersionId(currentStore.activeServerId);
+    if (!identity || identity.serverNumber !== pending.serverNumber) {
+      setPendingCaptureImport(null);
+      setCaptureNotice({
+        tone: "error",
+        text: "Select a version of the same server before replacing it.",
+      });
+      return;
+    }
+
+    applyMapStore({
+      ...currentStore,
+      serversById: {
+        ...currentStore.serversById,
+        [currentStore.activeServerId]: pending.snapshot,
+      },
+    });
+    clearUndoHistory();
+    setPendingCaptureImport(null);
+    setCaptureNotice({
+      tone: "success",
+      text: `Replaced ${currentStore.activeServerId} with ${pending.fileName}.`,
+    });
+  }
+
   function switchServer(serverId: string) {
     if (serverId === mapStore.activeServerId || !mapStore.serversById[serverId]) return;
 
@@ -1195,9 +1569,11 @@ export default function GameMapPage({ navigation }: GameMapPageProps) {
   }
 
   function addServer(serverId: string): boolean {
-    const normalizedServerId = normalizeServerId(serverId);
-    if (!normalizedServerId) return false;
-    if (latestStoreRef.current.serversById[normalizedServerId]) return false;
+    const serverNumber = normalizeServerNumber(serverId);
+    if (!serverNumber) return false;
+
+    const serverVersionId = createServerVersionId(serverNumber, 1);
+    if (latestStoreRef.current.serversById[serverVersionId]) return false;
 
     const hasSimulationServer =
       CITY_RACE_SERVER_ID in latestStoreRef.current.serversById;
@@ -1205,13 +1581,13 @@ export default function GameMapPage({ navigation }: GameMapPageProps) {
       (currentServerId) => currentServerId !== CITY_RACE_SERVER_ID
     );
     const nextStore: MultiServerMapStore = {
-      activeServerId: normalizedServerId,
+      activeServerId: serverVersionId,
       serverOrder: hasSimulationServer
-        ? [...normalServerOrder, normalizedServerId, CITY_RACE_SERVER_ID]
-        : [...normalServerOrder, normalizedServerId],
+        ? [...normalServerOrder, serverVersionId, CITY_RACE_SERVER_ID]
+        : [...normalServerOrder, serverVersionId],
       serversById: {
         ...latestStoreRef.current.serversById,
-        [normalizedServerId]: createDefaultServerSnapshot(mapConfig, firstTileId),
+        [serverVersionId]: createDefaultServerSnapshot(mapConfig, firstTileId),
       },
     };
 
@@ -1221,24 +1597,30 @@ export default function GameMapPage({ navigation }: GameMapPageProps) {
   }
 
   function renameActiveServer(serverId: string): boolean {
-    const normalizedServerId = normalizeServerId(serverId);
+    const serverNumber = normalizeServerNumber(serverId);
     const { activeServerId, serverOrder, serversById } = latestStoreRef.current;
+    const activeIdentity = parseServerVersionId(activeServerId);
 
-    if (activeServerId === CITY_RACE_SERVER_ID || !normalizedServerId) return false;
-    if (normalizedServerId === activeServerId) return true;
-    if (serversById[normalizedServerId]) return false;
+    if (!activeIdentity || !serverNumber) return false;
+    if (serverNumber === activeIdentity.serverNumber) return true;
+
+    const renamedServerId = createServerVersionId(
+      serverNumber,
+      activeIdentity.version
+    );
+    if (serversById[renamedServerId]) return false;
 
     const activeSnapshot = serversById[activeServerId];
     if (!activeSnapshot) return false;
 
     const nextServersById = { ...serversById };
     delete nextServersById[activeServerId];
-    nextServersById[normalizedServerId] = activeSnapshot;
+    nextServersById[renamedServerId] = activeSnapshot;
 
     applyMapStore({
-      activeServerId: normalizedServerId,
+      activeServerId: renamedServerId,
       serverOrder: serverOrder.map((currentServerId) =>
-        currentServerId === activeServerId ? normalizedServerId : currentServerId
+        currentServerId === activeServerId ? renamedServerId : currentServerId
       ),
       serversById: nextServersById,
     });
@@ -1376,26 +1758,47 @@ export default function GameMapPage({ navigation }: GameMapPageProps) {
         )}
       </p>
 
-      <MapToolbar
-        serverIds={mapStore.serverOrder}
-        activeServerId={mapStore.activeServerId}
-        simulationServerId={activeSeason === 2 ? CITY_RACE_SERVER_ID : undefined}
-        canRemoveActiveServer={canRemoveActiveServer}
-        clearMarkerCount={clearMarkerCount}
-        selectedMarker={selectedMarker}
-        ourTeam={ourTeam}
-        rivalTeams={rivalTeams}
-        enemyTeams={enemyTeams}
-        selectedRivalTeamId={selectedRivalTeamId}
-        selectedEnemyTeamId={selectedEnemyTeamId}
-        onServerSelect={switchServer}
-        onServerAdd={addServer}
-        onActiveServerRename={renameActiveServer}
-        onActiveServerRemove={removeActiveServer}
-        onMarkerChange={setSelectedMarker}
-        onRivalSelect={(id) => patchActiveSnapshot({ selectedRivalTeamId: id })}
-        onEnemySelect={(id) => patchActiveSnapshot({ selectedEnemyTeamId: id })}
-      />
+      <div className="map-toolbar-stack">
+        <MapToolbar
+          serverIds={mapStore.serverOrder}
+          activeServerId={mapStore.activeServerId}
+          activeServerNumber={activeServerIdentity?.serverNumber ?? ""}
+          simulationServerId={activeSeason === 2 ? CITY_RACE_SERVER_ID : undefined}
+          canRemoveActiveServer={canRemoveActiveServer}
+          clearMarkerCount={clearMarkerCount}
+          selectedMarker={selectedMarker}
+          ourTeam={ourTeam}
+          rivalTeams={rivalTeams}
+          enemyTeams={enemyTeams}
+          selectedRivalTeamId={selectedRivalTeamId}
+          selectedEnemyTeamId={selectedEnemyTeamId}
+          onServerSelect={switchServer}
+          onServerAdd={addServer}
+          onActiveServerRename={renameActiveServer}
+          onActiveServerRemove={removeActiveServer}
+          onCaptureImport={openCaptureFilePicker}
+          onCaptureExport={exportActiveCapture}
+          onMarkerChange={setSelectedMarker}
+          onRivalSelect={(id) => patchActiveSnapshot({ selectedRivalTeamId: id })}
+          onEnemySelect={(id) => patchActiveSnapshot({ selectedEnemyTeamId: id })}
+        />
+        <input
+          ref={captureFileInputRef}
+          className="map-capture-file-input"
+          type="file"
+          accept=".json,application/json"
+          aria-label="Choose game map capture JSON"
+          onChange={handleCaptureFileChange}
+        />
+        {captureNotice ? (
+          <p
+            className={`map-capture-notice map-capture-notice--${captureNotice.tone}`}
+            role={captureNotice.tone === "error" ? "alert" : "status"}
+          >
+            {captureNotice.text}
+          </p>
+        ) : null}
+      </div>
 
       <div className={`map-layout${panelCollapsed ? " map-layout--panel-collapsed" : ""}`}>
         <div
@@ -1548,6 +1951,23 @@ export default function GameMapPage({ navigation }: GameMapPageProps) {
           />
         )}
       </div>
+
+      {pendingCaptureImport ? (
+        <MapCaptureImportDialog
+          fileName={pendingCaptureImport.fileName}
+          seasonLabel={activeSeasonLabel}
+          sourceLabel={`${pendingCaptureImport.serverNumber}-${pendingCaptureImport.sourceVersion}`}
+          newVersionLabel={`${pendingCaptureImport.serverNumber}-${pendingCaptureImport.targetVersion}`}
+          replaceVersionLabel={
+            activeServerIdentity?.serverNumber === pendingCaptureImport.serverNumber
+              ? mapStore.activeServerId
+              : undefined
+          }
+          onImportAsVersion={importPendingCaptureAsVersion}
+          onReplaceVersion={replaceActiveVersionWithPendingCapture}
+          onClose={() => setPendingCaptureImport(null)}
+        />
+      ) : null}
 
       {pendingSimulationAction && pendingSimulationTile ? (
         <SimulationTimeDialog

@@ -1,4 +1,5 @@
 export { MapBoard } from "./MapBoard";
+export { MapCaptureImportDialog } from "./MapCaptureImportDialog";
 export { MapToolbar } from "./MapToolbar";
 export { ScorePanel } from "./ScorePanel";
 export { SimulationPanel } from "./SimulationPanel";
