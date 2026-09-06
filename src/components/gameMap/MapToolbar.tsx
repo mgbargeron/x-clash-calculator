@@ -15,6 +15,8 @@ type TeamItem = { code: string; name: string };
 type MapToolbarProps = {
   serverIds: string[];
   activeServerId: string;
+  activeServerNumber: string;
+  simulationServerId?: string;
   canRemoveActiveServer: boolean;
   clearMarkerCount: number;
   selectedMarker: TileMarker;
@@ -27,6 +29,8 @@ type MapToolbarProps = {
   onServerAdd: (id: string) => boolean;
   onActiveServerRename: (id: string) => boolean;
   onActiveServerRemove: () => void;
+  onCaptureImport: () => void;
+  onCaptureExport: () => void;
   onMarkerChange: (marker: TileMarker) => void;
   onRivalSelect: (id: string) => void;
   onEnemySelect: (id: string) => void;
@@ -46,6 +50,8 @@ function formatTeamDisplayLabel(code: unknown, name: unknown): string {
 export function MapToolbar({
   serverIds,
   activeServerId,
+  activeServerNumber,
+  simulationServerId,
   canRemoveActiveServer,
   clearMarkerCount,
   selectedMarker,
@@ -58,6 +64,8 @@ export function MapToolbar({
   onServerAdd,
   onActiveServerRename,
   onActiveServerRemove,
+  onCaptureImport,
+  onCaptureExport,
   onMarkerChange,
   onRivalSelect,
   onEnemySelect,
@@ -69,11 +77,12 @@ export function MapToolbar({
     setServerEditDraft,
     setServerEditInvalid,
     setIsEditingServerId,
-  } = useMapToolbarServerControls(activeServerId);
+  } = useMapToolbarServerControls(activeServerNumber);
 
   const [isAddingServer, setIsAddingServer] = useState(false);
   const [serverDraft, setServerDraft] = useState("");
   const [serverDraftInvalid, setServerDraftInvalid] = useState(false);
+  const isSimulationMode = activeServerId === simulationServerId;
 
   function submitServer() {
     const nextServerId = serverDraft.trim();
@@ -111,16 +120,24 @@ export function MapToolbar({
               key={serverId}
               className={`icon-tool-button server-tool-button ${
                 activeServerId === serverId ? "active" : ""
-              }`}
+              } ${serverId === simulationServerId ? "server-tool-button--simulation" : ""}`}
               type="button"
-              title={`Switch to server ${serverId}`}
-              aria-label={`Switch to server ${serverId}`}
-            onClick={() => onServerSelect(serverId)}
-          >
-            <span className="team-code">{serverId}</span>
-          </button>
+              title={
+                serverId === simulationServerId
+                  ? "Simulate City Race"
+                  : `Switch to server ${serverId}`
+              }
+              aria-label={
+                serverId === simulationServerId
+                  ? "Simulate City Race"
+                  : `Switch to server ${serverId}`
+              }
+              onClick={() => onServerSelect(serverId)}
+            >
+              <span className="team-code">{serverId}</span>
+            </button>
           ))}
-          {isEditingServerId ? (
+          {isEditingServerId && !isSimulationMode ? (
             <input
               className={`server-id-input server-id-input--edit ${serverEditInvalid ? "invalid" : ""}`}
               type="text"
@@ -128,15 +145,15 @@ export function MapToolbar({
               maxLength={3}
               inputMode="numeric"
               pattern="[0-9]{3}"
-              placeholder={activeServerId}
-              aria-label={`Edit active server number ${activeServerId}`}
+              placeholder={activeServerNumber}
+              aria-label={`Edit active server number ${activeServerNumber}`}
               aria-invalid={serverEditInvalid}
               onChange={(event) => {
                 setServerEditDraft(event.target.value.replace(/\D/g, "").slice(0, 3));
                 setServerEditInvalid(false);
               }}
               onBlur={() => {
-                if (serverEditDraft === activeServerId) {
+                if (serverEditDraft === activeServerNumber) {
                   setIsEditingServerId(false);
                   return;
                 }
@@ -149,7 +166,7 @@ export function MapToolbar({
                 }
 
                 if (event.key === "Escape") {
-                  setServerEditDraft(activeServerId);
+                  setServerEditDraft(activeServerNumber);
                   setServerEditInvalid(false);
                   setIsEditingServerId(false);
                 }
@@ -208,7 +225,7 @@ export function MapToolbar({
               +
             </button>
           ) : null}
-          {isEditingServerId ? (
+          {isEditingServerId && !isSimulationMode ? (
             <button
               className="map-toolbar-mini-button asidetip"
               type="button"
@@ -218,21 +235,21 @@ export function MapToolbar({
             >
               #
             </button>
-          ) : (
+          ) : !isSimulationMode ? (
             <button
               className="map-toolbar-mini-button asidetip"
               type="button"
               data-tip="Edit active server number"
-              aria-label={`Edit server number ${activeServerId}`}
+              aria-label={`Edit server number ${activeServerNumber}`}
               onClick={() => {
-                setServerEditDraft(activeServerId);
+                setServerEditDraft(activeServerNumber);
                 setServerEditInvalid(false);
                 setIsEditingServerId(true);
               }}
             >
               #
             </button>
-          )}
+          ) : null}
           <button
             className="remove-team-button asidetip"
             type="button"
@@ -243,10 +260,29 @@ export function MapToolbar({
           >
             ×
           </button>
+          <div className="map-capture-actions" aria-label="Map capture file actions">
+            <button
+              className="secondary-button map-capture-button"
+              type="button"
+              onClick={onCaptureImport}
+            >
+              Import
+            </button>
+            <button
+              className="secondary-button map-capture-button"
+              type="button"
+              disabled={isSimulationMode}
+              title={isSimulationMode ? "Select a numbered server version to export" : undefined}
+              onClick={onCaptureExport}
+            >
+              Export
+            </button>
+          </div>
         </div>
       </div>
 
-      <div className="map-toolbar-section tile-tools">
+      {!isSimulationMode ? (
+        <div className="map-toolbar-section tile-tools">
         {markerTools.map((tool) => (
           <button
             className={`icon-tool-button clear-tool-button ${tool.marker} ${
@@ -311,7 +347,8 @@ export function MapToolbar({
             <span className="team-code">{team.code}</span>
           </button>
         ))}
-      </div>
+        </div>
+      ) : null}
     </div>
   );
 }

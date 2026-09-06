@@ -1,4 +1,5 @@
 import { GameMapTileKind } from "../../utils/gameMapConfig";
+import type { CityRaceSimulation } from "../../utils/cityRaceSimulation";
 
 export type TileMarker = "none" | "base" | "enemy" | "rival";
 
@@ -40,6 +41,7 @@ export type GameMapSnapshot = {
   selectedTileId: string;
   selectedRivalTeamId: string;
   selectedEnemyTeamId: string;
+  simulation?: CityRaceSimulation;
 };
 
 export type MultiServerMapStore = {
@@ -62,6 +64,7 @@ export type GameMapTileConfig = {
   height?: number;
   kind: GameMapTileKind;
   level?: number;
+  label?: string;
   shape?: string[];
 };
 

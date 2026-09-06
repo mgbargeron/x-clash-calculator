@@ -1,10 +1,24 @@
-import {useEffect, useEffectEvent, useMemo, useRef, useState, type CSSProperties, type ReactNode} from "react";
+import {
+  useEffect,
+  useEffectEvent,
+  useMemo,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type CSSProperties,
+  type ReactNode,
+} from "react";
 
 import {
+  MapCaptureImportDialog,
   MapBoard,
   MapToolbar,
   ScorePanel,
+  SimulationPanel,
+  SimulationSettingsDialog,
+  SimulationTimeDialog,
 } from "../components/gameMap";
+import type { MapTileSimulationState } from "../components/gameMap/MapTile";
 import type {
   EnemyTeam,
   GameMapSnapshot,
@@ -23,14 +37,42 @@ import { useUndoKeyboardShortcut } from "../hooks/useUndoKeyboardShortcut";
 import { useBeforeUnloadSave } from "../hooks/useBeforeUnloadSave";
 import { useMapStoreRefSync } from "../hooks/useMapStoreRefSync";
 import { useMapStoreSaver } from "../hooks/useMapStoreSaver";
-import { getNextSeason, getSeasonConfig, getSeasonConfigEntry, normalizeSeason } from "../utils/gameMapConfig";
+import {
+  getNextSeason,
+  getSeasonConfig,
+  getSeasonConfigEntry,
+  isConfiguredSeason,
+  normalizeSeason,
+} from "../utils/gameMapConfig";
 import type { Season, GameMapConfig } from "../utils/gameMapConfig";
+import {
+  CITY_RACE_SERVER_ID,
+  advanceCityRaceDay,
+  captureCityRaceTile,
+  createDefaultCityRaceSimulation,
+  getCityRaceCaptureError,
+  getCityRaceTileStatus,
+  hasCityRaceActionsOnDay,
+  normalizeCityRaceSimulation,
+  releaseCityRaceTile,
+  resetCityRaceDay,
+  resetCityRaceSimulationSettings,
+  setCityRaceCaptureTime,
+  setCityRaceFinalDay,
+  setCityRaceSimulationSettings,
+  type CityRaceSimulation,
+  type CityRaceSimulationSettings,
+} from "../utils/cityRaceSimulation";
 
 const MAP_STORAGE_KEY = "game-map-season";
 const LEGACY_SEASON_MAP_STORAGE_KEY = "game-map-v2";
 const LEGACY_MAP_STORAGE_KEY = "game-map-v1";
 const SEASON_STORAGE_KEY = "game-map-season";
-const DEFAULT_SERVER_ID = "001";
+const DEFAULT_SERVER_NUMBER = "001";
+const DEFAULT_SERVER_ID = "001-1";
+const MAP_CAPTURE_FORMAT = "x-clash-game-map-capture";
+const MAP_CAPTURE_FORMAT_VERSION = 1;
+const MAX_MAP_CAPTURE_FILE_BYTES = 5 * 1024 * 1024;
 const MAX_ACTION_HISTORY = 10;
 const MIN_MAP_ZOOM = 0.25;
 const MAX_MAP_ZOOM = 2;
@@ -47,6 +89,7 @@ type StoredMapData = {
   selectedTileId?: unknown;
   selectedRivalTeamId?: unknown;
   selectedEnemyTeamId?: unknown;
+  simulation?: unknown;
 };
 
 type StoredMultiServerMapData = {
@@ -65,6 +108,20 @@ type StoredTile = {
   rivalTeamId?: unknown;
   enemyTeamId?: unknown;
   note?: unknown;
+};
+type StoredMapCaptureFile = {
+  format?: unknown;
+  formatVersion?: unknown;
+  season?: unknown;
+  seasonName?: unknown;
+  serverNumber?: unknown;
+  version?: unknown;
+  exportedAt?: unknown;
+  capture?: unknown;
+};
+type ServerVersionIdentity = {
+  serverNumber: string;
+  version: number;
 };
 
 function createSeasonStorageKey(season: Season): string {
@@ -123,14 +180,65 @@ function syncGeneratedCode(currentCode: string, previousName: string, nextName: 
   return currentCode;
 }
 
-function isValidServerId(value: string): value is ServerId {
+function isValidServerNumber(value: string): boolean {
   return /^\d{3}$/.test(value);
 }
 
-function normalizeServerId(value: unknown): ServerId | null {
+function normalizeServerNumber(value: unknown): string | null {
   if (typeof value !== "string") return null;
   const trimmed = value.trim();
-  return isValidServerId(trimmed) ? trimmed : null;
+  return isValidServerNumber(trimmed) ? trimmed : null;
+}
+
+function createServerVersionId(serverNumber: string, version: number): ServerId {
+  return `${serverNumber}-${version}`;
+}
+
+function parseServerVersionId(value: unknown): ServerVersionIdentity | null {
+  if (typeof value !== "string") return null;
+
+  const trimmed = value.trim();
+  const legacyServerNumber = normalizeServerNumber(trimmed);
+  if (legacyServerNumber) {
+    return { serverNumber: legacyServerNumber, version: 1 };
+  }
+
+  const match = /^(\d{3})-([1-9]\d*)$/.exec(trimmed);
+  if (!match) return null;
+
+  const version = Number(match[2]);
+  if (!Number.isSafeInteger(version)) return null;
+
+  return {
+    serverNumber: match[1],
+    version,
+  };
+}
+
+function normalizeServerId(value: unknown): ServerId | null {
+  const identity = parseServerVersionId(value);
+  return identity
+    ? createServerVersionId(identity.serverNumber, identity.version)
+    : null;
+}
+
+function createSeasonFileToken(season: Season): string {
+  return `Season${season}`;
+}
+
+function parseMapCaptureFilename(
+  fileName: string
+): { serverNumber: string; season: Season } | null {
+  const match = /^(\d{3})-Season([1-9]\d*)[^/]*\.json$/i.exec(fileName.trim());
+  if (!match) return null;
+
+  const season = Number(match[2]);
+  if (!isConfiguredSeason(season)) return null;
+
+  return {
+    serverNumber: match[1],
+    season,
+  };
 }
 
 function parseStoredPayload(raw: unknown): unknown {
@@ -190,6 +298,29 @@ function normalizeMap(
   }, {});
 }
 
+function createSimulationTiles(
+  mapConfig: GameMapConfig,
+  tiles: MapTilesById,
+  simulation: CityRaceSimulation
+): MapTilesById {
+  const ownedTileIds = new Set([
+    ...simulation.currentTowns,
+    ...simulation.currentMines,
+    ...simulation.currentTradeCenters,
+  ]);
+
+  return mapConfig.tiles.reduce<MapTilesById>((nextTiles, tileConfig) => {
+    const existingTile = tiles[tileConfig.id] ?? { marker: "none", note: "" };
+    nextTiles[tileConfig.id] = {
+      ...existingTile,
+      marker: ownedTileIds.has(tileConfig.id) ? "base" : "none",
+      rivalTeamId: undefined,
+      enemyTeamId: undefined,
+    };
+    return nextTiles;
+  }, {});
+}
+
 function normalizeRivalTeams(stored: unknown): RivalTeam[] {
   const arr = Array.isArray(stored) ? stored : [];
 
@@ -229,28 +360,48 @@ function normalizeEnemyTeams(stored: unknown): EnemyTeam[] {
 
 function createDefaultServerSnapshot(
   mapConfig: GameMapConfig,
-  firstTileId: string
+  firstTileId: string,
+  simulationMode = false
 ): GameMapSnapshot {
+  const simulation = simulationMode ? createDefaultCityRaceSimulation() : undefined;
+
   return {
-    tiles: normalizeMap(mapConfig, [], []),
+    tiles: simulation
+      ? createSimulationTiles(mapConfig, normalizeMap(mapConfig, [], []), simulation)
+      : normalizeMap(mapConfig, [], []),
     rivalTeams: [],
     ourTeam: DEFAULT_OUR_TEAM,
     enemyTeams: [],
     selectedTileId: firstTileId,
     selectedRivalTeamId: "",
     selectedEnemyTeamId: "",
+    simulation,
   };
 }
 
 function createDefaultMapStore(
   mapConfig: GameMapConfig,
-  firstTileId: string
+  firstTileId: string,
+  season: Season
 ): MultiServerMapStore {
+  const includeSimulation = season === 2;
+
   return {
     activeServerId: DEFAULT_SERVER_ID,
-    serverOrder: [DEFAULT_SERVER_ID],
+    serverOrder: includeSimulation
+      ? [DEFAULT_SERVER_ID, CITY_RACE_SERVER_ID]
+      : [DEFAULT_SERVER_ID],
     serversById: {
       [DEFAULT_SERVER_ID]: createDefaultServerSnapshot(mapConfig, firstTileId),
+      ...(includeSimulation
+        ? {
+            [CITY_RACE_SERVER_ID]: createDefaultServerSnapshot(
+              mapConfig,
+              firstTileId,
+              true
+            ),
+          }
+        : {}),
     },
   };
 }
@@ -258,13 +409,20 @@ function createDefaultMapStore(
 function normalizeStoredSnapshot(
   raw: unknown,
   mapConfig: GameMapConfig,
-  firstTileId: string
+  firstTileId: string,
+  simulationMode = false
 ): GameMapSnapshot {
   const stored = (raw ?? {}) as StoredMapData;
   const rivalTeams = normalizeRivalTeams(stored.rivalTeams);
   const enemyTeams = normalizeEnemyTeams(stored.enemyTeams);
   const ourTeam = normalizeOurTeam(stored.ourTeam);
-  const tiles = normalizeMap(mapConfig, rivalTeams, enemyTeams, stored.tiles);
+  const simulation = simulationMode
+    ? normalizeCityRaceSimulation(stored.simulation, mapConfig)
+    : undefined;
+  const normalizedTiles = normalizeMap(mapConfig, rivalTeams, enemyTeams, stored.tiles);
+  const tiles = simulation
+    ? createSimulationTiles(mapConfig, normalizedTiles, simulation)
+    : normalizedTiles;
   const selectedTileId =
     typeof stored.selectedTileId === "string" && stored.selectedTileId in tiles
       ? stored.selectedTileId
@@ -288,18 +446,20 @@ function normalizeStoredSnapshot(
     selectedTileId,
     selectedRivalTeamId,
     selectedEnemyTeamId,
+    simulation,
   };
 }
 
 function normalizeStoredMapStore(
   raw: unknown,
   mapConfig: GameMapConfig,
-  firstTileId: string
+  firstTileId: string,
+  season: Season
 ): MultiServerMapStore {
   const parsed = parseStoredPayload(raw);
 
   if (!parsed || typeof parsed !== "object") {
-    return createDefaultMapStore(mapConfig, firstTileId);
+    return createDefaultMapStore(mapConfig, firstTileId, season);
   }
 
   if ("serversById" in parsed || "serverOrder" in parsed || "activeServerId" in parsed) {
@@ -314,10 +474,14 @@ function normalizeStoredMapStore(
       const serverId = normalizeServerId(candidate);
       if (!serverId || normalizedOrder.includes(serverId)) continue;
 
+      const rawKey = typeof candidate === "string" ? candidate : "";
+      const rawSnapshots = serversByIdRaw as Record<string, unknown>;
       const rawSnapshot =
-        serverId in (serversByIdRaw as Record<string, unknown>)
-          ? (serversByIdRaw as Record<string, unknown>)[serverId]
-          : undefined;
+        rawKey in rawSnapshots
+          ? rawSnapshots[rawKey]
+          : serverId in rawSnapshots
+            ? rawSnapshots[serverId]
+            : undefined;
 
       normalizedOrder.push(serverId);
       normalizedServersById[serverId] = normalizeStoredSnapshot(rawSnapshot, mapConfig, firstTileId);
@@ -332,13 +496,33 @@ function normalizeStoredMapStore(
     }
 
     if (normalizedOrder.length === 0) {
-      return createDefaultMapStore(mapConfig, firstTileId);
+      normalizedOrder.push(DEFAULT_SERVER_ID);
+      normalizedServersById[DEFAULT_SERVER_ID] = createDefaultServerSnapshot(
+        mapConfig,
+        firstTileId
+      );
     }
 
+    if (season === 2) {
+      const rawSimulationSnapshot = (serversByIdRaw as Record<string, unknown>)[
+        CITY_RACE_SERVER_ID
+      ];
+      normalizedOrder.push(CITY_RACE_SERVER_ID);
+      normalizedServersById[CITY_RACE_SERVER_ID] = normalizeStoredSnapshot(
+        rawSimulationSnapshot,
+        mapConfig,
+        firstTileId,
+        true
+      );
+    }
+
+    const requestedActiveServerId = normalizeServerId(stored.activeServerId);
     const normalizedActiveServerId =
-      normalizeServerId(stored.activeServerId) && normalizedServersById[normalizeServerId(stored.activeServerId)!]
-        ? normalizeServerId(stored.activeServerId)!
-        : normalizedOrder[0];
+      season === 2 && stored.activeServerId === CITY_RACE_SERVER_ID
+        ? CITY_RACE_SERVER_ID
+        : requestedActiveServerId && normalizedServersById[requestedActiveServerId]
+          ? requestedActiveServerId
+          : normalizedOrder[0];
 
     return {
       activeServerId: normalizedActiveServerId,
@@ -349,16 +533,27 @@ function normalizeStoredMapStore(
 
   if ("tiles" in parsed || "rivalTeams" in parsed || "ourTeam" in parsed || "enemyTeams" in parsed) {
     const legacySnapshot = normalizeStoredSnapshot(parsed, mapConfig, firstTileId);
-    return {
+    const legacyStore: MultiServerMapStore = {
       activeServerId: DEFAULT_SERVER_ID,
       serverOrder: [DEFAULT_SERVER_ID],
       serversById: {
         [DEFAULT_SERVER_ID]: legacySnapshot,
       },
     };
+
+    if (season === 2) {
+      legacyStore.serverOrder.push(CITY_RACE_SERVER_ID);
+      legacyStore.serversById[CITY_RACE_SERVER_ID] = createDefaultServerSnapshot(
+        mapConfig,
+        firstTileId,
+        true
+      );
+    }
+
+    return legacyStore;
   }
 
-  return createDefaultMapStore(mapConfig, firstTileId);
+  return createDefaultMapStore(mapConfig, firstTileId, season);
 }
 
 async function loadStoredMapStore(
@@ -395,11 +590,11 @@ async function loadStoredMapStore(
   }
 
   if (raw) {
-    return normalizeStoredMapStore(raw, mapConfig, firstTileId);
+    return normalizeStoredMapStore(raw, mapConfig, firstTileId, season);
   }
 
   if (season !== 1) {
-    return createDefaultMapStore(mapConfig, firstTileId);
+    return createDefaultMapStore(mapConfig, firstTileId, season);
   }
 
   let legacyRaw: unknown = null;
@@ -411,10 +606,10 @@ async function loadStoredMapStore(
   }
 
   if (legacyRaw) {
-    return normalizeStoredMapStore(legacyRaw, mapConfig, firstTileId);
+    return normalizeStoredMapStore(legacyRaw, mapConfig, firstTileId, season);
   }
 
-  return createDefaultMapStore(mapConfig, firstTileId);
+  return createDefaultMapStore(mapConfig, firstTileId, season);
 }
 
 async function saveStoredMapStore(store: MultiServerMapStore, season: Season) {
@@ -443,7 +638,48 @@ function replaceActiveServerSnapshot(
   };
 }
 
+function getNextAvailableServerVersion(
+  store: MultiServerMapStore,
+  serverNumber: string,
+  preferredVersion: number
+): number {
+  const usedVersions = new Set(
+    store.serverOrder.flatMap((serverId) => {
+      const identity = parseServerVersionId(serverId);
+      return identity?.serverNumber === serverNumber ? [identity.version] : [];
+    })
+  );
+
+  if (!usedVersions.has(preferredVersion)) return preferredVersion;
+
+  let version = Math.max(preferredVersion, ...usedVersions) + 1;
+  while (usedVersions.has(version)) {
+    version += 1;
+  }
+  return version;
+}
+
 type GameMapPageProps = { navigation: ReactNode };
+type SimulationNotice = {
+  tone: "info" | "error" | "success";
+  text: string;
+} | null;
+type PendingSimulationAction = {
+  action: "capture" | "release";
+  tileId: string;
+  time: string;
+};
+type MapCaptureNotice = {
+  tone: "error" | "success";
+  text: string;
+} | null;
+type PendingMapCaptureImport = {
+  fileName: string;
+  serverNumber: string;
+  sourceVersion: number;
+  targetVersion: number;
+  snapshot: GameMapSnapshot;
+};
 
 export default function GameMapPage({ navigation }: GameMapPageProps) {
   const [activeSeason, setActiveSeason] = useState<Season>(() => {
@@ -461,9 +697,10 @@ export default function GameMapPage({ navigation }: GameMapPageProps) {
   useSeasonPersistence(activeSeason);
 
   const boardRef = useRef<HTMLDivElement | null>(null);
+  const captureFileInputRef = useRef<HTMLInputElement | null>(null);
   const hasLoadedStoredMap = useRef(false);
   const [mapStore, setMapStore] = useState<MultiServerMapStore>(() =>
-    createDefaultMapStore(mapConfig, firstTileId)
+    createDefaultMapStore(mapConfig, firstTileId, activeSeason)
   );
   const [loadedSeason, setLoadedSeason] = useState<Season | null>(null);
 
@@ -475,11 +712,32 @@ export default function GameMapPage({ navigation }: GameMapPageProps) {
   const [teamManagementLocked, setTeamManagementLocked] = useState(true);
   const [mapZoom, setMapZoom] = useState(DEFAULT_MAP_ZOOM);
   const [panelCollapsed, setPanelCollapsed] = useState(false);
+  const [simulationNotice, setSimulationNotice] = useState<SimulationNotice>(null);
+  const [pendingSimulationAction, setPendingSimulationAction] =
+    useState<PendingSimulationAction | null>(null);
+  const [simulationDialogError, setSimulationDialogError] = useState<string | null>(
+    null
+  );
+  const [simulationSettingsOpen, setSimulationSettingsOpen] = useState(false);
+  const [captureNotice, setCaptureNotice] = useState<MapCaptureNotice>(null);
+  const [pendingCaptureImport, setPendingCaptureImport] =
+    useState<PendingMapCaptureImport | null>(null);
 
   const activeServerSnapshot = mapStore.serversById[mapStore.activeServerId];
+  const activeServerIdentity = parseServerVersionId(mapStore.activeServerId);
+  const isSimulationMode =
+    activeSeason === 2 && mapStore.activeServerId === CITY_RACE_SERVER_ID;
+  const simulation =
+    activeServerSnapshot.simulation ?? createDefaultCityRaceSimulation();
+  const storedCityRaceSimulation =
+    mapStore.serversById[CITY_RACE_SERVER_ID]?.simulation ??
+    createDefaultCityRaceSimulation();
   const activeSeasonConfig = getSeasonConfigEntry(activeSeason);
   const activeSeasonLabel = activeSeasonConfig.label;
   const nextSeason = getNextSeason(activeSeason);
+  const pendingSimulationTile = pendingSimulationAction
+    ? mapConfig.tiles.find((tile) => tile.id === pendingSimulationAction.tileId)
+    : undefined;
   const {
     tiles,
     rivalTeams,
@@ -512,7 +770,8 @@ export default function GameMapPage({ navigation }: GameMapPageProps) {
       a.enemyTeams === b.enemyTeams &&
       a.selectedTileId === b.selectedTileId &&
       a.selectedRivalTeamId === b.selectedRivalTeamId &&
-      a.selectedEnemyTeamId === b.selectedEnemyTeamId
+      a.selectedEnemyTeamId === b.selectedEnemyTeamId &&
+      a.simulation === b.simulation
     );
   }
 
@@ -534,11 +793,25 @@ export default function GameMapPage({ navigation }: GameMapPageProps) {
     undoStackRef.current = [];
   }
 
+  function undoLastAction() {
+    if (pendingSimulationAction) return;
+    const snapshotToRestore = undoStackRef.current[0];
+    if (!snapshotToRestore) return;
+
+    undoStackRef.current = undoStackRef.current.slice(1);
+    applyActiveSnapshot(snapshotToRestore);
+    setSimulationNotice(
+      isSimulationMode
+        ? { tone: "success", text: "The last simulation action was undone." }
+        : null
+    );
+  }
+
   useEffect(() => {
     let cancelled = false;
     hasLoadedStoredMap.current = false;
     setLoadedSeason(null);
-    applyMapStore(createDefaultMapStore(mapConfig, firstTileId));
+    applyMapStore(createDefaultMapStore(mapConfig, firstTileId, activeSeason));
     clearUndoHistory();
 
     void loadStoredMapStore(mapConfig, firstTileId, activeSeason).then((storedMapStore) => {
@@ -555,6 +828,18 @@ export default function GameMapPage({ navigation }: GameMapPageProps) {
     };
   }, [firstTileId, mapConfig, activeSeason]);
 
+  useEffect(() => {
+    setPanelCollapsed(false);
+    setSimulationNotice(null);
+    setPendingSimulationAction(null);
+    setSimulationDialogError(null);
+    setPendingCaptureImport(null);
+  }, [activeSeason, mapStore.activeServerId]);
+
+  useEffect(() => {
+    setCaptureNotice(null);
+  }, [activeSeason]);
+
   useMapStoreRefSync(latestStoreRef, latestSnapshotRef, mapStore, activeServerSnapshot);
 
   useMapStoreSaver(mapStore, activeSeason, loadedSeason === activeSeason);
@@ -570,12 +855,7 @@ export default function GameMapPage({ navigation }: GameMapPageProps) {
     patchActiveSnapshot({ selectedTileId: tileId });
   });
 
-  useUndoKeyboardShortcut(() => {
-    const snapshotToRestore = undoStackRef.current[0];
-    if (!snapshotToRestore) return;
-    undoStackRef.current = undoStackRef.current.slice(1);
-    applyActiveSnapshot(snapshotToRestore);
-  });
+  useUndoKeyboardShortcut(undoLastAction);
 
   const {
     clearMarkerCount,
@@ -584,14 +864,203 @@ export default function GameMapPage({ navigation }: GameMapPageProps) {
     enemyPointSummary,
   } = usePointSummaries({ mapConfig, tiles, rivalTeams, enemyTeams });
 
-  const canRemoveActiveServer = mapStore.serverOrder.length > 1;
-  const activeServerLabel = useMemo(() => `Server ${mapStore.activeServerId}`, [mapStore.activeServerId]);
+  const normalServerCount = mapStore.serverOrder.filter(
+    (serverId) => serverId !== CITY_RACE_SERVER_ID
+  ).length;
+  const canRemoveActiveServer =
+    mapStore.activeServerId !== CITY_RACE_SERVER_ID && normalServerCount > 1;
+  const canUndo = undoStackRef.current.length > 0;
+  const hasCurrentDayActions =
+    isSimulationMode && hasCityRaceActionsOnDay(simulation);
+  const activeServerLabel = useMemo(
+    () =>
+      isSimulationMode
+        ? "Simulate City Race"
+        : `Server ${activeServerIdentity?.serverNumber ?? mapStore.activeServerId} · Version ${
+            activeServerIdentity?.version ?? 1
+          }`,
+    [activeServerIdentity, isSimulationMode, mapStore.activeServerId]
+  );
+  const simulationStates = useMemo<Record<string, MapTileSimulationState> | undefined>(() => {
+    if (!isSimulationMode) return undefined;
+
+    return Object.fromEntries(
+      mapConfig.tiles.map((tile) => {
+        const status = getCityRaceTileStatus(simulation, tile, mapConfig);
+        const levelText = typeof tile.level === "number" ? `Level ${tile.level} ` : "";
+        const tileName =
+          tile.kind === "copperMine"
+            ? "Copper Mine"
+            : tile.kind === "town"
+              ? "Town"
+              : "Trade Center";
+        const description =
+          status === "owned"
+            ? `${levelText}${tileName} is owned. Click to choose its drop time.`
+            : status === "capturable"
+              ? `Capture ${levelText}${tileName} on Day ${simulation.currentDay}. Click to choose the time.`
+              : getCityRaceCaptureError(simulation, tile, mapConfig) ??
+                `${levelText}${tileName} is unavailable.`;
+
+        return [tile.id, { status, description }];
+      })
+    );
+  }, [isSimulationMode, mapConfig, simulation]);
 
   function resetMap() {
     commitAction((current) => ({
       ...current,
       tiles: normalizeMap(mapConfig, current.rivalTeams, current.enemyTeams),
     }));
+  }
+
+  function createSimulationSnapshot(
+    current: GameMapSnapshot,
+    nextSimulation: CityRaceSimulation,
+    selectedId = current.selectedTileId
+  ): GameMapSnapshot {
+    return {
+      ...current,
+      selectedTileId: selectedId,
+      simulation: nextSimulation,
+      tiles: createSimulationTiles(mapConfig, current.tiles, nextSimulation),
+    };
+  }
+
+  function changeSimulationFinalDay(value: number) {
+    const current = getCurrentSnapshot();
+    const currentSimulation =
+      current.simulation ?? createDefaultCityRaceSimulation();
+    const nextSimulation = setCityRaceFinalDay(currentSimulation, value);
+    if (nextSimulation.finalDay === currentSimulation.finalDay) return;
+    applyActiveSnapshot(createSimulationSnapshot(current, nextSimulation));
+    setSimulationNotice({
+      tone: "info",
+      text: `The simulation now runs through Day ${nextSimulation.finalDay} at 00:00.`,
+    });
+  }
+
+  function saveSimulationSettings(settings: CityRaceSimulationSettings) {
+    const nextSimulation = setCityRaceSimulationSettings(
+      storedCityRaceSimulation,
+      settings
+    );
+    const simulationSnapshot =
+      latestStoreRef.current.serversById[CITY_RACE_SERVER_ID];
+    if (simulationSnapshot) {
+      applyMapStore({
+        ...latestStoreRef.current,
+        serversById: {
+          ...latestStoreRef.current.serversById,
+          [CITY_RACE_SERVER_ID]: createSimulationSnapshot(
+            simulationSnapshot,
+            nextSimulation
+          ),
+        },
+      });
+    }
+    setSimulationSettingsOpen(false);
+    setSimulationNotice({
+      tone: "success",
+      text: "Town unlock times and hourly yields were updated.",
+    });
+  }
+
+  function restoreSimulationSettings() {
+    const nextSimulation = resetCityRaceSimulationSettings(
+      storedCityRaceSimulation
+    );
+    const simulationSnapshot =
+      latestStoreRef.current.serversById[CITY_RACE_SERVER_ID];
+    if (simulationSnapshot) {
+      applyMapStore({
+        ...latestStoreRef.current,
+        serversById: {
+          ...latestStoreRef.current.serversById,
+          [CITY_RACE_SERVER_ID]: createSimulationSnapshot(
+            simulationSnapshot,
+            nextSimulation
+          ),
+        },
+      });
+    }
+    setSimulationSettingsOpen(false);
+    setSimulationNotice({
+      tone: "success",
+      text: "Town settings were restored to their defaults.",
+    });
+  }
+
+  function advanceSimulationDay() {
+    const current = getCurrentSnapshot();
+    const currentSimulation =
+      current.simulation ?? createDefaultCityRaceSimulation();
+    const nextSimulation = advanceCityRaceDay(currentSimulation);
+
+    if (nextSimulation === currentSimulation) {
+      setSimulationNotice({
+        tone: "info",
+        text: `Day ${currentSimulation.finalDay} is the configured final score day.`,
+      });
+      return;
+    }
+
+    commitAction((snapshot) =>
+      createSimulationSnapshot(snapshot, nextSimulation)
+    );
+    setSimulationNotice({
+      tone: "info",
+      text: `Day ${nextSimulation.currentDay} begins at 00:00. Daily capture limits have reset.`,
+    });
+  }
+
+  function resetCurrentSimulationDay() {
+    const current = getCurrentSnapshot();
+    const currentSimulation =
+      current.simulation ?? createDefaultCityRaceSimulation();
+
+    if (!hasCityRaceActionsOnDay(currentSimulation)) {
+      setSimulationNotice({
+        tone: "info",
+        text: `Day ${currentSimulation.currentDay} has no captures or drops to reset.`,
+      });
+      return;
+    }
+
+    const shouldReset = window.confirm(
+      `Reset Day ${currentSimulation.currentDay}? Today's captures and drops will be removed.`
+    );
+    if (!shouldReset) return;
+
+    const nextSimulation = resetCityRaceDay(currentSimulation);
+    commitAction((snapshot) =>
+      createSimulationSnapshot(snapshot, nextSimulation)
+    );
+    setSimulationNotice({
+      tone: "success",
+      text: `Day ${nextSimulation.currentDay} was reset to 00:00. Tiles held at the start of the day were restored.`,
+    });
+  }
+
+  function resetSimulation() {
+    const shouldReset = window.confirm(
+      "Reset the City Race simulation? This removes its capture history and score."
+    );
+    if (!shouldReset) return;
+
+    const currentSimulation =
+      getCurrentSnapshot().simulation ?? createDefaultCityRaceSimulation();
+    const nextSimulation = {
+      ...createDefaultCityRaceSimulation(),
+      settings: currentSimulation.settings,
+    };
+    commitAction((current) =>
+      createSimulationSnapshot(current, nextSimulation, firstTileId)
+    );
+    setSimulationNotice({
+      tone: "success",
+      text: "The City Race simulation has been reset.",
+    });
   }
 
   function updateOurTeamCode(value: string) {
@@ -745,7 +1214,125 @@ export default function GameMapPage({ navigation }: GameMapPageProps) {
     }
   }
 
+  function openSimulationTimeDialog(
+    action: "capture" | "release",
+    tileId: string
+  ) {
+    const tileConfig = mapConfig.tiles.find((tile) => tile.id === tileId);
+    if (!tileConfig) return;
+
+    const current = getCurrentSnapshot();
+    const currentSimulation =
+      current.simulation ?? createDefaultCityRaceSimulation();
+
+    if (action === "capture") {
+      const latestPossibleTime = setCityRaceCaptureTime(
+        currentSimulation,
+        "23:59"
+      );
+      const captureError = getCityRaceCaptureError(
+        latestPossibleTime,
+        tileConfig,
+        mapConfig
+      );
+      if (captureError) {
+        patchActiveSnapshot({ selectedTileId: tileId });
+        setSimulationNotice({ tone: "error", text: captureError });
+        return;
+      }
+    } else {
+      const isOwned =
+        currentSimulation.currentTowns.includes(tileId) ||
+        currentSimulation.currentMines.includes(tileId) ||
+        currentSimulation.currentTradeCenters.includes(tileId);
+      if (!isOwned) {
+        patchActiveSnapshot({ selectedTileId: tileId });
+        setSimulationNotice({
+          tone: "error",
+          text: "Only a currently owned tile can be dropped.",
+        });
+        return;
+      }
+    }
+
+    patchActiveSnapshot({ selectedTileId: tileId });
+    setPendingSimulationAction({
+      action,
+      tileId,
+      time: currentSimulation.captureTime,
+    });
+    setSimulationDialogError(null);
+    setSimulationNotice(null);
+  }
+
+  function closeSimulationTimeDialog() {
+    setPendingSimulationAction(null);
+    setSimulationDialogError(null);
+  }
+
+  function confirmSimulationTime() {
+    if (!pendingSimulationAction) return;
+    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(pendingSimulationAction.time)) {
+      setSimulationDialogError("Choose a valid 24-hour server time.");
+      return;
+    }
+
+    const tileConfig = mapConfig.tiles.find(
+      (tile) => tile.id === pendingSimulationAction.tileId
+    );
+    if (!tileConfig) {
+      closeSimulationTimeDialog();
+      return;
+    }
+
+    const current = getCurrentSnapshot();
+    const currentSimulation =
+      current.simulation ?? createDefaultCityRaceSimulation();
+    const timedSimulation = setCityRaceCaptureTime(
+      currentSimulation,
+      pendingSimulationAction.time
+    );
+    const result =
+      pendingSimulationAction.action === "capture"
+        ? captureCityRaceTile(timedSimulation, tileConfig, mapConfig)
+        : releaseCityRaceTile(timedSimulation, tileConfig);
+
+    if (result.error) {
+      setSimulationDialogError(result.error);
+      return;
+    }
+
+    commitAction((snapshot) =>
+      createSimulationSnapshot(snapshot, result.state, tileConfig.id)
+    );
+    const tileName =
+      tileConfig.kind === "copperMine"
+        ? "Copper Mine"
+        : tileConfig.kind === "town"
+          ? "Town"
+          : "Trade Center";
+    const actionText =
+      pendingSimulationAction.action === "capture" ? "captured" : "dropped";
+    setSimulationNotice({
+      tone: "success",
+      text: `${tileName} L${tileConfig.level ?? 0} ${actionText} at Day ${result.state.currentDay} ${result.state.captureTime}.`,
+    });
+    closeSimulationTimeDialog();
+  }
+
   function paintTile(tileId: string) {
+    if (isSimulationMode) {
+      const current = getCurrentSnapshot();
+      const currentSimulation =
+        current.simulation ?? createDefaultCityRaceSimulation();
+      const isOwned =
+        currentSimulation.currentTowns.includes(tileId) ||
+        currentSimulation.currentMines.includes(tileId) ||
+        currentSimulation.currentTradeCenters.includes(tileId);
+      openSimulationTimeDialog(isOwned ? "release" : "capture", tileId);
+      return;
+    }
+
     commitAction((current) => {
       if (selectedMarker === "rival" && !current.selectedRivalTeamId) return current;
       if (selectedMarker === "enemy" && !current.selectedEnemyTeamId) return current;
@@ -778,6 +1365,10 @@ export default function GameMapPage({ navigation }: GameMapPageProps) {
   }
 
   function clearTile(tileId: string) {
+    if (isSimulationMode) {
+      return;
+    }
+
     commitAction((current) => {
       const existingTile = current.tiles[tileId];
       if (!existingTile || existingTile.marker === "none") {
@@ -798,6 +1389,246 @@ export default function GameMapPage({ navigation }: GameMapPageProps) {
     });
   }
 
+  function openCaptureFilePicker() {
+    const input = captureFileInputRef.current;
+    if (!input) return;
+
+    input.value = "";
+    input.click();
+  }
+
+  async function handleCaptureFileChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    setPendingCaptureImport(null);
+    setCaptureNotice(null);
+
+    if (file.size > MAX_MAP_CAPTURE_FILE_BYTES) {
+      setCaptureNotice({
+        tone: "error",
+        text: `${file.name} is too large to be a map capture file.`,
+      });
+      return;
+    }
+
+    const filenameMetadata = parseMapCaptureFilename(file.name);
+    if (!filenameMetadata) {
+      setCaptureNotice({
+        tone: "error",
+        text: `Use a capture filename like ${DEFAULT_SERVER_NUMBER}-${createSeasonFileToken(
+          activeSeason
+        )}-v1.json.`,
+      });
+      return;
+    }
+
+    if (filenameMetadata.season !== activeSeason) {
+      setCaptureNotice({
+        tone: "error",
+        text: `${file.name} belongs to ${getSeasonConfigEntry(
+          filenameMetadata.season
+        ).label}. Switch to that season before importing it.`,
+      });
+      return;
+    }
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(await file.text());
+    } catch {
+      setCaptureNotice({
+        tone: "error",
+        text: `${file.name} is not valid JSON.`,
+      });
+      return;
+    }
+
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      setCaptureNotice({
+        tone: "error",
+        text: `${file.name} is not a game map capture file.`,
+      });
+      return;
+    }
+
+    const stored = parsed as StoredMapCaptureFile;
+    const fileSeason =
+      typeof stored.season === "number" && isConfiguredSeason(stored.season)
+        ? stored.season
+        : null;
+    const serverNumber = normalizeServerNumber(stored.serverNumber);
+    const sourceVersion =
+      typeof stored.version === "number" &&
+      Number.isSafeInteger(stored.version) &&
+      stored.version >= 1
+        ? stored.version
+        : null;
+    const hasCapture =
+      Boolean(stored.capture) &&
+      typeof stored.capture === "object" &&
+      !Array.isArray(stored.capture);
+
+    if (
+      stored.format !== MAP_CAPTURE_FORMAT ||
+      stored.formatVersion !== MAP_CAPTURE_FORMAT_VERSION ||
+      !fileSeason ||
+      !serverNumber ||
+      !sourceVersion ||
+      !hasCapture
+    ) {
+      setCaptureNotice({
+        tone: "error",
+        text: `${file.name} is not a supported game map capture file.`,
+      });
+      return;
+    }
+
+    if (fileSeason !== activeSeason || filenameMetadata.season !== fileSeason) {
+      setCaptureNotice({
+        tone: "error",
+        text: `The filename and capture data must both identify ${activeSeasonLabel}.`,
+      });
+      return;
+    }
+
+    if (filenameMetadata.serverNumber !== serverNumber) {
+      setCaptureNotice({
+        tone: "error",
+        text: "The server number in the filename does not match the capture data.",
+      });
+      return;
+    }
+
+    const targetVersion = getNextAvailableServerVersion(
+      latestStoreRef.current,
+      serverNumber,
+      sourceVersion
+    );
+    setPendingCaptureImport({
+      fileName: file.name,
+      serverNumber,
+      sourceVersion,
+      targetVersion,
+      snapshot: normalizeStoredSnapshot(stored.capture, mapConfig, firstTileId),
+    });
+  }
+
+  function exportActiveCapture() {
+    const currentStore = latestStoreRef.current;
+    const identity = parseServerVersionId(currentStore.activeServerId);
+    const snapshot = currentStore.serversById[currentStore.activeServerId];
+
+    if (!identity || !snapshot) {
+      setCaptureNotice({
+        tone: "error",
+        text: "Select a numbered server version before exporting.",
+      });
+      return;
+    }
+
+    const fileName = `${identity.serverNumber}-${createSeasonFileToken(
+      activeSeason
+    )}-v${identity.version}.json`;
+    const payload = {
+      format: MAP_CAPTURE_FORMAT,
+      formatVersion: MAP_CAPTURE_FORMAT_VERSION,
+      season: activeSeason,
+      seasonName: activeSeasonLabel,
+      serverNumber: identity.serverNumber,
+      version: identity.version,
+      exportedAt: new Date().toISOString(),
+      capture: snapshot,
+    };
+
+    const url = URL.createObjectURL(
+      new Blob([JSON.stringify(payload, null, 2)], {
+        type: "application/json",
+      })
+    );
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = fileName;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
+
+    setCaptureNotice({
+      tone: "success",
+      text: `Exported ${fileName}.`,
+    });
+  }
+
+  function importPendingCaptureAsVersion() {
+    const pending = pendingCaptureImport;
+    if (!pending) return;
+
+    const currentStore = latestStoreRef.current;
+    const targetVersion = getNextAvailableServerVersion(
+      currentStore,
+      pending.serverNumber,
+      pending.targetVersion
+    );
+    const targetServerId = createServerVersionId(
+      pending.serverNumber,
+      targetVersion
+    );
+    const hasSimulationServer =
+      CITY_RACE_SERVER_ID in currentStore.serversById;
+    const normalServerOrder = currentStore.serverOrder.filter(
+      (serverId) => serverId !== CITY_RACE_SERVER_ID
+    );
+
+    applyMapStore({
+      activeServerId: targetServerId,
+      serverOrder: hasSimulationServer
+        ? [...normalServerOrder, targetServerId, CITY_RACE_SERVER_ID]
+        : [...normalServerOrder, targetServerId],
+      serversById: {
+        ...currentStore.serversById,
+        [targetServerId]: pending.snapshot,
+      },
+    });
+    clearUndoHistory();
+    setPendingCaptureImport(null);
+    setCaptureNotice({
+      tone: "success",
+      text: `Imported ${pending.fileName} as ${targetServerId}.`,
+    });
+  }
+
+  function replaceActiveVersionWithPendingCapture() {
+    const pending = pendingCaptureImport;
+    if (!pending) return;
+
+    const currentStore = latestStoreRef.current;
+    const identity = parseServerVersionId(currentStore.activeServerId);
+    if (!identity || identity.serverNumber !== pending.serverNumber) {
+      setPendingCaptureImport(null);
+      setCaptureNotice({
+        tone: "error",
+        text: "Select a version of the same server before replacing it.",
+      });
+      return;
+    }
+
+    applyMapStore({
+      ...currentStore,
+      serversById: {
+        ...currentStore.serversById,
+        [currentStore.activeServerId]: pending.snapshot,
+      },
+    });
+    clearUndoHistory();
+    setPendingCaptureImport(null);
+    setCaptureNotice({
+      tone: "success",
+      text: `Replaced ${currentStore.activeServerId} with ${pending.fileName}.`,
+    });
+  }
+
   function switchServer(serverId: string) {
     if (serverId === mapStore.activeServerId || !mapStore.serversById[serverId]) return;
 
@@ -809,16 +1640,25 @@ export default function GameMapPage({ navigation }: GameMapPageProps) {
   }
 
   function addServer(serverId: string): boolean {
-    const normalizedServerId = normalizeServerId(serverId);
-    if (!normalizedServerId) return false;
-    if (latestStoreRef.current.serversById[normalizedServerId]) return false;
+    const serverNumber = normalizeServerNumber(serverId);
+    if (!serverNumber) return false;
 
+    const serverVersionId = createServerVersionId(serverNumber, 1);
+    if (latestStoreRef.current.serversById[serverVersionId]) return false;
+
+    const hasSimulationServer =
+      CITY_RACE_SERVER_ID in latestStoreRef.current.serversById;
+    const normalServerOrder = latestStoreRef.current.serverOrder.filter(
+      (currentServerId) => currentServerId !== CITY_RACE_SERVER_ID
+    );
     const nextStore: MultiServerMapStore = {
-      activeServerId: normalizedServerId,
-      serverOrder: [...latestStoreRef.current.serverOrder, normalizedServerId],
+      activeServerId: serverVersionId,
+      serverOrder: hasSimulationServer
+        ? [...normalServerOrder, serverVersionId, CITY_RACE_SERVER_ID]
+        : [...normalServerOrder, serverVersionId],
       serversById: {
         ...latestStoreRef.current.serversById,
-        [normalizedServerId]: createDefaultServerSnapshot(mapConfig, firstTileId),
+        [serverVersionId]: createDefaultServerSnapshot(mapConfig, firstTileId),
       },
     };
 
@@ -828,24 +1668,30 @@ export default function GameMapPage({ navigation }: GameMapPageProps) {
   }
 
   function renameActiveServer(serverId: string): boolean {
-    const normalizedServerId = normalizeServerId(serverId);
+    const serverNumber = normalizeServerNumber(serverId);
     const { activeServerId, serverOrder, serversById } = latestStoreRef.current;
+    const activeIdentity = parseServerVersionId(activeServerId);
 
-    if (!normalizedServerId) return false;
-    if (normalizedServerId === activeServerId) return true;
-    if (serversById[normalizedServerId]) return false;
+    if (!activeIdentity || !serverNumber) return false;
+    if (serverNumber === activeIdentity.serverNumber) return true;
+
+    const renamedServerId = createServerVersionId(
+      serverNumber,
+      activeIdentity.version
+    );
+    if (serversById[renamedServerId]) return false;
 
     const activeSnapshot = serversById[activeServerId];
     if (!activeSnapshot) return false;
 
     const nextServersById = { ...serversById };
     delete nextServersById[activeServerId];
-    nextServersById[normalizedServerId] = activeSnapshot;
+    nextServersById[renamedServerId] = activeSnapshot;
 
     applyMapStore({
-      activeServerId: normalizedServerId,
+      activeServerId: renamedServerId,
       serverOrder: serverOrder.map((currentServerId) =>
-        currentServerId === activeServerId ? normalizedServerId : currentServerId
+        currentServerId === activeServerId ? renamedServerId : currentServerId
       ),
       serversById: nextServersById,
     });
@@ -855,7 +1701,15 @@ export default function GameMapPage({ navigation }: GameMapPageProps) {
 
   function removeActiveServer() {
     const { activeServerId, serverOrder, serversById } = latestStoreRef.current;
-    if (serverOrder.length <= 1) return;
+    const normalServers = serverOrder.filter(
+      (serverId) => serverId !== CITY_RACE_SERVER_ID
+    );
+    if (
+      activeServerId === CITY_RACE_SERVER_ID ||
+      normalServers.length <= 1
+    ) {
+      return;
+    }
     const shouldRemoveServer = window.confirm(
       `Delete server ${activeServerId}? This will remove its saved map, teams, and tile data.`
     );
@@ -960,32 +1814,114 @@ export default function GameMapPage({ navigation }: GameMapPageProps) {
         </div>
       </div>
       <p style={{ margin: 0, fontSize: "0.8rem", color: "#8a9bc0" }}>
-        {activeServerLabel}. Click a tile to select it, then use the toolbar to paint markers.
-        Right-click a tile to clear it. <kbd style={kbdStyle}>Ctrl+Z</kbd> to undo.
+        {isSimulationMode ? (
+          <>
+            {activeServerLabel}. Capture from an edge Level 1 mine, then expand through
+            touching tiles. Click an owned tile to choose when to drop it.{" "}
+            <kbd style={kbdStyle}>Ctrl+Z</kbd> to undo.
+          </>
+        ) : (
+          <>
+            {activeServerLabel}. Click a tile to select it, then use the toolbar to paint
+            markers. Right-click a tile to clear it.{" "}
+            <kbd style={kbdStyle}>Ctrl+Z</kbd> to undo.
+          </>
+        )}
       </p>
 
-      <MapToolbar
-        serverIds={mapStore.serverOrder}
-        activeServerId={mapStore.activeServerId}
-        canRemoveActiveServer={canRemoveActiveServer}
-        clearMarkerCount={clearMarkerCount}
-        selectedMarker={selectedMarker}
-        ourTeam={ourTeam}
-        rivalTeams={rivalTeams}
-        enemyTeams={enemyTeams}
-        selectedRivalTeamId={selectedRivalTeamId}
-        selectedEnemyTeamId={selectedEnemyTeamId}
-        onServerSelect={switchServer}
-        onServerAdd={addServer}
-        onActiveServerRename={renameActiveServer}
-        onActiveServerRemove={removeActiveServer}
-        onMarkerChange={setSelectedMarker}
-        onRivalSelect={(id) => patchActiveSnapshot({ selectedRivalTeamId: id })}
-        onEnemySelect={(id) => patchActiveSnapshot({ selectedEnemyTeamId: id })}
-      />
+      <div className="map-toolbar-stack">
+        <MapToolbar
+          serverIds={mapStore.serverOrder}
+          activeServerId={mapStore.activeServerId}
+          activeServerNumber={activeServerIdentity?.serverNumber ?? ""}
+          simulationServerId={activeSeason === 2 ? CITY_RACE_SERVER_ID : undefined}
+          canRemoveActiveServer={canRemoveActiveServer}
+          clearMarkerCount={clearMarkerCount}
+          selectedMarker={selectedMarker}
+          ourTeam={ourTeam}
+          rivalTeams={rivalTeams}
+          enemyTeams={enemyTeams}
+          selectedRivalTeamId={selectedRivalTeamId}
+          selectedEnemyTeamId={selectedEnemyTeamId}
+          onServerSelect={switchServer}
+          onServerAdd={addServer}
+          onActiveServerRename={renameActiveServer}
+          onActiveServerRemove={removeActiveServer}
+          onCaptureImport={openCaptureFilePicker}
+          onCaptureExport={exportActiveCapture}
+          onMarkerChange={setSelectedMarker}
+          onRivalSelect={(id) => patchActiveSnapshot({ selectedRivalTeamId: id })}
+          onEnemySelect={(id) => patchActiveSnapshot({ selectedEnemyTeamId: id })}
+        />
+        <input
+          ref={captureFileInputRef}
+          className="map-capture-file-input"
+          type="file"
+          accept=".json,application/json"
+          aria-label="Choose game map capture JSON"
+          onChange={handleCaptureFileChange}
+        />
+        {captureNotice ? (
+          <p
+            className={`map-capture-notice map-capture-notice--${captureNotice.tone}`}
+            role={captureNotice.tone === "error" ? "alert" : "status"}
+          >
+            {captureNotice.text}
+          </p>
+        ) : null}
+      </div>
 
       <div className={`map-layout${panelCollapsed ? " map-layout--panel-collapsed" : ""}`}>
-        <div className="map-board-column">
+        <div
+          className={`map-board-column${
+            isSimulationMode ? " map-board-column--simulation" : ""
+          }`}
+        >
+          {isSimulationMode ? (
+            <div className="city-race-board-actions" aria-label="Simulation controls">
+              <button
+                className="city-race-action-button city-race-action-button--day"
+                type="button"
+                onClick={resetCurrentSimulationDay}
+                disabled={!hasCurrentDayActions}
+              >
+                <span className="city-race-action-icon" aria-hidden="true">
+                  ↺
+                </span>
+                <span>
+                  <strong>Reset Day {simulation.currentDay}</strong>
+                  <small>Remove today&apos;s captures and drops</small>
+                </span>
+              </button>
+              <button
+                className="city-race-action-button city-race-action-button--undo"
+                type="button"
+                onClick={undoLastAction}
+                disabled={!canUndo}
+              >
+                <span className="city-race-action-icon" aria-hidden="true">
+                  ↶
+                </span>
+                <span>
+                  <strong>Undo Last Action</strong>
+                  <small>Restore the previous change · Ctrl+Z</small>
+                </span>
+              </button>
+              <button
+                className="city-race-action-button city-race-action-button--reset"
+                type="button"
+                onClick={resetSimulation}
+              >
+                <span className="city-race-action-icon" aria-hidden="true">
+                  ×
+                </span>
+                <span>
+                  <strong>Reset Simulation</strong>
+                  <small>Clear every day, capture, and score</small>
+                </span>
+              </button>
+            </div>
+          ) : null}
           <MapBoard
             config={mapConfig}
             tiles={tiles}
@@ -993,6 +1929,7 @@ export default function GameMapPage({ navigation }: GameMapPageProps) {
             ourTeam={ourTeam}
             rivalTeams={rivalTeams}
             enemyTeams={enemyTeams}
+            simulationStates={simulationStates}
             zoom={mapZoom}
             boardRef={boardRef}
             onTileSelect={(tileId) => patchActiveSnapshot({ selectedTileId: tileId })}
@@ -1049,31 +1986,103 @@ export default function GameMapPage({ navigation }: GameMapPageProps) {
           </div>
         </div>
 
-        <ScorePanel
-          teamManagementLocked={teamManagementLocked}
-          ourTeam={ourTeam}
-          rivalTeams={rivalTeams}
-          enemyTeams={enemyTeams}
-          ourTeamPoints={ourTeamPointSummary}
-          rivalPoints={rivalPointSummary}
-          enemyPoints={enemyPointSummary}
-          onToggleLock={() => setTeamManagementLocked((current) => !current)}
-          onResetMap={resetMap}
-          onUpdateOurTeamCode={updateOurTeamCode}
-          onUpdateOurTeamName={updateOurTeamName}
-          updateOurTeamColor={updateOurTeamColor}
-          addRival={addRival}
-          updateRivalCode={updateRivalCode}
-          updateRivalName={updateRivalName}
-          updateRivalColor={updateRivalColor}
-          removeRival={removeRival}
-          addEnemy={addEnemy}
-          updateEnemyCode={updateEnemyCode}
-          updateEnemyName={updateEnemyName}
-          removeEnemy={removeEnemy}
-          onCollapseChange={setPanelCollapsed}
-        />
+        {isSimulationMode ? (
+          <SimulationPanel
+            simulation={simulation}
+            mapConfig={mapConfig}
+            notice={simulationNotice}
+            onAdvanceDay={advanceSimulationDay}
+            onFinalDayChange={changeSimulationFinalDay}
+            onOpenSettings={() => setSimulationSettingsOpen(true)}
+            onCollapseChange={setPanelCollapsed}
+          />
+        ) : (
+          <ScorePanel
+            teamManagementLocked={teamManagementLocked}
+            ourTeam={ourTeam}
+            rivalTeams={rivalTeams}
+            enemyTeams={enemyTeams}
+            ourTeamPoints={ourTeamPointSummary}
+            rivalPoints={rivalPointSummary}
+            enemyPoints={enemyPointSummary}
+            onToggleLock={() => setTeamManagementLocked((current) => !current)}
+            onResetMap={resetMap}
+            onOpenSimulationSettings={
+              activeSeason === 2
+                ? () => setSimulationSettingsOpen(true)
+                : undefined
+            }
+            onUpdateOurTeamCode={updateOurTeamCode}
+            onUpdateOurTeamName={updateOurTeamName}
+            updateOurTeamColor={updateOurTeamColor}
+            addRival={addRival}
+            updateRivalCode={updateRivalCode}
+            updateRivalName={updateRivalName}
+            updateRivalColor={updateRivalColor}
+            removeRival={removeRival}
+            addEnemy={addEnemy}
+            updateEnemyCode={updateEnemyCode}
+            updateEnemyName={updateEnemyName}
+            removeEnemy={removeEnemy}
+            onCollapseChange={setPanelCollapsed}
+          />
+        )}
       </div>
+
+      {pendingCaptureImport ? (
+        <MapCaptureImportDialog
+          fileName={pendingCaptureImport.fileName}
+          seasonLabel={activeSeasonLabel}
+          sourceLabel={`${pendingCaptureImport.serverNumber}-${pendingCaptureImport.sourceVersion}`}
+          newVersionLabel={`${pendingCaptureImport.serverNumber}-${pendingCaptureImport.targetVersion}`}
+          replaceVersionLabel={
+            activeServerIdentity?.serverNumber === pendingCaptureImport.serverNumber
+              ? mapStore.activeServerId
+              : undefined
+          }
+          onImportAsVersion={importPendingCaptureAsVersion}
+          onReplaceVersion={replaceActiveVersionWithPendingCapture}
+          onClose={() => setPendingCaptureImport(null)}
+        />
+      ) : null}
+
+      {pendingSimulationAction && pendingSimulationTile ? (
+        <SimulationTimeDialog
+          action={pendingSimulationAction.action}
+          day={simulation.currentDay}
+          tileName={`${
+            pendingSimulationTile.label ??
+            (pendingSimulationTile.kind === "copperMine"
+              ? "Copper Mine"
+              : pendingSimulationTile.kind === "town"
+                ? "Town"
+                : "Trade Center")
+          }${
+            typeof pendingSimulationTile.level === "number"
+              ? ` · Level ${pendingSimulationTile.level}`
+              : ""
+          }`}
+          time={pendingSimulationAction.time}
+          error={simulationDialogError}
+          onTimeChange={(value) => {
+            setPendingSimulationAction((current) =>
+              current ? { ...current, time: value } : current
+            );
+            setSimulationDialogError(null);
+          }}
+          onConfirm={confirmSimulationTime}
+          onClose={closeSimulationTimeDialog}
+        />
+      ) : null}
+
+      {simulationSettingsOpen ? (
+        <SimulationSettingsDialog
+          settings={storedCityRaceSimulation.settings}
+          onSave={saveSimulationSettings}
+          onReset={restoreSimulationSettings}
+          onClose={() => setSimulationSettingsOpen(false)}
+        />
+      ) : null}
     </section>
   );
 }
