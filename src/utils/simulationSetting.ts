@@ -25,6 +25,7 @@ export const CITY_RACE_SETTINGS = {
     4: 400,
     5: 500,
     6: 600,
+    7: 700,
   },
   townUnlockDayByLevel: {
     1: 1,
@@ -37,6 +38,6 @@ export const CITY_RACE_SETTINGS = {
   },
   tradeCenterUnlockDay: 21,
   // No event-specific amounts have been supplied yet. Level 7 towns use this
-  // same first-capture rule, but still produce no Dark Oil.
+  // same first-capture rule.
   initialTownCaptureBonus: 0,
 } as const;

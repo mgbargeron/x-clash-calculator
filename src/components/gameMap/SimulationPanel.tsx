@@ -16,12 +16,28 @@ type SimulationNotice = {
   text: string;
 } | null;
 
+function SettingsIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path
+        d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7ZM19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V21h-4v-.08A1.7 1.7 0 0 0 9 19.37a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.63 15 1.7 1.7 0 0 0 3.08 14H3v-4h.08A1.7 1.7 0 0 0 4.63 9a1.7 1.7 0 0 0-.34-1.88l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 0 0 9 4.63a1.7 1.7 0 0 0 1-1.55V3h4v.08A1.7 1.7 0 0 0 15 4.63a1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0 0 19.37 9c.25.61.85 1 1.55 1H21v4h-.08c-.7 0-1.3.39-1.52 1Z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.9"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 type SimulationPanelProps = {
   simulation: CityRaceSimulation;
   mapConfig: GameMapConfig;
   notice: SimulationNotice;
   onAdvanceDay: () => void;
   onFinalDayChange: (value: number) => void;
+  onOpenSettings: () => void;
   onCollapseChange?: (collapsed: boolean) => void;
 };
 
@@ -50,6 +66,7 @@ export function SimulationPanel({
   notice,
   onAdvanceDay,
   onFinalDayChange,
+  onOpenSettings,
   onCollapseChange,
 }: SimulationPanelProps) {
   const [collapsed, setCollapsed] = useState(false);
@@ -104,14 +121,25 @@ export function SimulationPanel({
           </div>
           <strong>Day {simulation.currentDay} · 00:00 score</strong>
         </div>
-        <button
-          className="secondary-button aside-control-button city-race-collapse-button"
-          type="button"
-          onClick={() => toggleCollapsed(true)}
-          aria-label="Hide simulation panel"
-        >
-          ›
-        </button>
+        <div className="city-race-heading-actions">
+          <button
+            className="secondary-button aside-control-button city-race-settings-button asidetip"
+            type="button"
+            onClick={onOpenSettings}
+            aria-label="Open City Race settings"
+            data-tip="City Race settings"
+          >
+            <SettingsIcon />
+          </button>
+          <button
+            className="secondary-button aside-control-button city-race-collapse-button"
+            type="button"
+            onClick={() => toggleCollapsed(true)}
+            aria-label="Hide simulation panel"
+          >
+            ›
+          </button>
+        </div>
       </div>
 
       <div className="city-race-score-card">

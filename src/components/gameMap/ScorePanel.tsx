@@ -43,6 +43,7 @@ type ScorePanelProps = {
   enemyPoints: Record<string, MarkerPointSummary>;
   onToggleLock: () => void;
   onResetMap: () => void;
+  onOpenSimulationSettings?: () => void;
   onUpdateOurTeamCode: (value: string) => void;
   onUpdateOurTeamName: (value: string) => void;
   updateOurTeamColor: (color: string) => void;
@@ -69,6 +70,7 @@ export function ScorePanel({
   enemyPoints,
   onToggleLock,
   onResetMap,
+  onOpenSimulationSettings,
   onUpdateOurTeamCode,
   onUpdateOurTeamName,
   updateOurTeamColor,
@@ -122,6 +124,7 @@ export function ScorePanel({
         locked={teamManagementLocked}
         onToggleLock={onToggleLock}
         onResetMap={onResetMap}
+        onOpenSettings={onOpenSimulationSettings}
       />
 
       {/* Our Team - can edit name, code, and color */}

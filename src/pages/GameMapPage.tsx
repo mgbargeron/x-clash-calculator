@@ -15,6 +15,7 @@ import {
   MapToolbar,
   ScorePanel,
   SimulationPanel,
+  SimulationSettingsDialog,
   SimulationTimeDialog,
 } from "../components/gameMap";
 import type { MapTileSimulationState } from "../components/gameMap/MapTile";
@@ -55,9 +56,12 @@ import {
   normalizeCityRaceSimulation,
   releaseCityRaceTile,
   resetCityRaceDay,
+  resetCityRaceSimulationSettings,
   setCityRaceCaptureTime,
   setCityRaceFinalDay,
+  setCityRaceSimulationSettings,
   type CityRaceSimulation,
+  type CityRaceSimulationSettings,
 } from "../utils/cityRaceSimulation";
 
 const MAP_STORAGE_KEY = "game-map-season";
@@ -714,6 +718,7 @@ export default function GameMapPage({ navigation }: GameMapPageProps) {
   const [simulationDialogError, setSimulationDialogError] = useState<string | null>(
     null
   );
+  const [simulationSettingsOpen, setSimulationSettingsOpen] = useState(false);
   const [captureNotice, setCaptureNotice] = useState<MapCaptureNotice>(null);
   const [pendingCaptureImport, setPendingCaptureImport] =
     useState<PendingMapCaptureImport | null>(null);
@@ -724,6 +729,9 @@ export default function GameMapPage({ navigation }: GameMapPageProps) {
     activeSeason === 2 && mapStore.activeServerId === CITY_RACE_SERVER_ID;
   const simulation =
     activeServerSnapshot.simulation ?? createDefaultCityRaceSimulation();
+  const storedCityRaceSimulation =
+    mapStore.serversById[CITY_RACE_SERVER_ID]?.simulation ??
+    createDefaultCityRaceSimulation();
   const activeSeasonConfig = getSeasonConfigEntry(activeSeason);
   const activeSeasonLabel = activeSeasonConfig.label;
   const nextSeason = getNextSeason(activeSeason);
@@ -932,6 +940,57 @@ export default function GameMapPage({ navigation }: GameMapPageProps) {
     });
   }
 
+  function saveSimulationSettings(settings: CityRaceSimulationSettings) {
+    const nextSimulation = setCityRaceSimulationSettings(
+      storedCityRaceSimulation,
+      settings
+    );
+    const simulationSnapshot =
+      latestStoreRef.current.serversById[CITY_RACE_SERVER_ID];
+    if (simulationSnapshot) {
+      applyMapStore({
+        ...latestStoreRef.current,
+        serversById: {
+          ...latestStoreRef.current.serversById,
+          [CITY_RACE_SERVER_ID]: createSimulationSnapshot(
+            simulationSnapshot,
+            nextSimulation
+          ),
+        },
+      });
+    }
+    setSimulationSettingsOpen(false);
+    setSimulationNotice({
+      tone: "success",
+      text: "Town unlock times and hourly yields were updated.",
+    });
+  }
+
+  function restoreSimulationSettings() {
+    const nextSimulation = resetCityRaceSimulationSettings(
+      storedCityRaceSimulation
+    );
+    const simulationSnapshot =
+      latestStoreRef.current.serversById[CITY_RACE_SERVER_ID];
+    if (simulationSnapshot) {
+      applyMapStore({
+        ...latestStoreRef.current,
+        serversById: {
+          ...latestStoreRef.current.serversById,
+          [CITY_RACE_SERVER_ID]: createSimulationSnapshot(
+            simulationSnapshot,
+            nextSimulation
+          ),
+        },
+      });
+    }
+    setSimulationSettingsOpen(false);
+    setSimulationNotice({
+      tone: "success",
+      text: "Town settings were restored to their defaults.",
+    });
+  }
+
   function advanceSimulationDay() {
     const current = getCurrentSnapshot();
     const currentSimulation =
@@ -989,7 +1048,12 @@ export default function GameMapPage({ navigation }: GameMapPageProps) {
     );
     if (!shouldReset) return;
 
-    const nextSimulation = createDefaultCityRaceSimulation();
+    const currentSimulation =
+      getCurrentSnapshot().simulation ?? createDefaultCityRaceSimulation();
+    const nextSimulation = {
+      ...createDefaultCityRaceSimulation(),
+      settings: currentSimulation.settings,
+    };
     commitAction((current) =>
       createSimulationSnapshot(current, nextSimulation, firstTileId)
     );
@@ -1929,6 +1993,7 @@ export default function GameMapPage({ navigation }: GameMapPageProps) {
             notice={simulationNotice}
             onAdvanceDay={advanceSimulationDay}
             onFinalDayChange={changeSimulationFinalDay}
+            onOpenSettings={() => setSimulationSettingsOpen(true)}
             onCollapseChange={setPanelCollapsed}
           />
         ) : (
@@ -1942,6 +2007,11 @@ export default function GameMapPage({ navigation }: GameMapPageProps) {
             enemyPoints={enemyPointSummary}
             onToggleLock={() => setTeamManagementLocked((current) => !current)}
             onResetMap={resetMap}
+            onOpenSimulationSettings={
+              activeSeason === 2
+                ? () => setSimulationSettingsOpen(true)
+                : undefined
+            }
             onUpdateOurTeamCode={updateOurTeamCode}
             onUpdateOurTeamName={updateOurTeamName}
             updateOurTeamColor={updateOurTeamColor}
@@ -2002,6 +2072,15 @@ export default function GameMapPage({ navigation }: GameMapPageProps) {
           }}
           onConfirm={confirmSimulationTime}
           onClose={closeSimulationTimeDialog}
+        />
+      ) : null}
+
+      {simulationSettingsOpen ? (
+        <SimulationSettingsDialog
+          settings={storedCityRaceSimulation.settings}
+          onSave={saveSimulationSettings}
+          onReset={restoreSimulationSettings}
+          onClose={() => setSimulationSettingsOpen(false)}
         />
       ) : null}
     </section>

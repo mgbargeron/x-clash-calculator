@@ -13,6 +13,13 @@ export const CITY_RACE_PRODUCTION_PER_HOUR = CITY_RACE_SETTINGS.darkOilPerHourBy
 export const CITY_RACE_TOWN_UNLOCK_DAY = CITY_RACE_SETTINGS.townUnlockDayByLevel;
 
 export type CityRaceTileKind = "copperMine" | "town" | "tradeCenter";
+export type CityRaceTownLevel = 1 | 2 | 3 | 4 | 5 | 6 | 7;
+
+export type CityRaceSimulationSettings = {
+  townUnlockDayByLevel: Record<CityRaceTownLevel, number>;
+  townUnlockHourByLevel: Record<CityRaceTownLevel, number>;
+  darkOilPerHourByTownLevel: Record<CityRaceTownLevel, number>;
+};
 
 export type CityRaceCapture = {
   kind: CityRaceTileKind;
@@ -32,6 +39,7 @@ export type CityRaceSimulation = {
   currentDay: number;
   finalDay: number;
   captureTime: string;
+  settings: CityRaceSimulationSettings;
 };
 
 export type CityRaceTileStatus =
@@ -64,6 +72,25 @@ type ParsedTimestamp = {
 
 const SERVER_TIME_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)$/;
 const TIMESTAMP_PATTERN = /^([1-9]\d*)-([01]\d|2[0-3]):([0-5]\d)$/;
+export const CITY_RACE_TOWN_LEVELS: CityRaceTownLevel[] = [1, 2, 3, 4, 5, 6, 7];
+
+function createDefaultCityRaceSettings(): CityRaceSimulationSettings {
+  return {
+    townUnlockDayByLevel: { ...CITY_RACE_SETTINGS.townUnlockDayByLevel },
+    townUnlockHourByLevel: {
+      1: 0,
+      2: 0,
+      3: 0,
+      4: 0,
+      5: 0,
+      6: 0,
+      7: 0,
+    },
+    darkOilPerHourByTownLevel: {
+      ...CITY_RACE_SETTINGS.darkOilPerHourByTownLevel,
+    },
+  };
+}
 
 function isCityRaceTileKind(value: unknown): value is CityRaceTileKind {
   return value === "town" || value === "copperMine" || value === "tradeCenter";
@@ -196,8 +223,40 @@ function validateActionTime(state: CityRaceSimulation): string | null {
   return null;
 }
 
-function getTownUnlockDay(level: number): number | null {
-  return CITY_RACE_TOWN_UNLOCK_DAY[level as keyof typeof CITY_RACE_TOWN_UNLOCK_DAY] ?? null;
+function normalizeCityRaceSettings(raw: unknown): CityRaceSimulationSettings {
+  const defaults = createDefaultCityRaceSettings();
+  if (!raw || typeof raw !== "object") return defaults;
+
+  const stored = raw as Partial<CityRaceSimulationSettings>;
+  for (const level of CITY_RACE_TOWN_LEVELS) {
+    defaults.townUnlockDayByLevel[level] = normalizeInteger(
+      stored.townUnlockDayByLevel?.[level],
+      defaults.townUnlockDayByLevel[level],
+      1
+    );
+    defaults.townUnlockHourByLevel[level] = Math.min(
+      23,
+      normalizeInteger(stored.townUnlockHourByLevel?.[level], 0, 0)
+    );
+    defaults.darkOilPerHourByTownLevel[level] = normalizeInteger(
+      stored.darkOilPerHourByTownLevel?.[level],
+      defaults.darkOilPerHourByTownLevel[level],
+      0
+    );
+  }
+  return defaults;
+}
+
+function getTownUnlockMinute(
+  state: CityRaceSimulation,
+  level: number
+): number | null {
+  if (!CITY_RACE_TOWN_LEVELS.includes(level as CityRaceTownLevel)) return null;
+  const townLevel = level as CityRaceTownLevel;
+  return (
+    (state.settings.townUnlockDayByLevel[townLevel] - 1) * 24 * 60 +
+    state.settings.townUnlockHourByLevel[townLevel] * 60
+  );
 }
 
 export function createDefaultCityRaceSimulation(): CityRaceSimulation {
@@ -210,6 +269,7 @@ export function createDefaultCityRaceSimulation(): CityRaceSimulation {
     currentDay: 1,
     finalDay: CITY_RACE_DEFAULT_FINAL_DAY,
     captureTime: "00:00",
+    settings: createDefaultCityRaceSettings(),
   };
 }
 
@@ -242,6 +302,7 @@ export function normalizeCityRaceSimulation(
     typeof stored.captureTime === "string" && SERVER_TIME_PATTERN.test(stored.captureTime)
       ? stored.captureTime
       : "00:00";
+  const settings = normalizeCityRaceSettings(stored.settings);
   const tilesById = new Map(mapConfig.tiles.map((tile) => [tile.id, tile]));
   const captures: CityRaceCapture[] = [];
   const openTileIds = new Set<string>();
@@ -337,6 +398,7 @@ export function normalizeCityRaceSimulation(
     currentDay,
     finalDay,
     captureTime,
+    settings,
   };
 }
 
@@ -376,12 +438,20 @@ export function getCityRaceCaptureError(
 
   const counts = getCityRaceCaptureCounts(state);
   if (tile.kind === "town") {
-    const unlockDay = getTownUnlockDay(getTileLevel(tile));
-    if (unlockDay === null) {
+    const unlockMinute = getTownUnlockMinute(state, getTileLevel(tile));
+    if (unlockMinute === null) {
       return `Level ${getTileLevel(tile)} towns do not have an unlock day.`;
     }
-    if (state.currentDay < unlockDay) {
-      return `Level ${getTileLevel(tile)} towns unlock on Day ${unlockDay}.`;
+    const actionMinute = timestampToMinutes(
+      formatCityRaceTimestamp(state.currentDay, state.captureTime)
+    );
+    if (actionMinute < unlockMinute) {
+      const level = getTileLevel(tile) as CityRaceTownLevel;
+      const unlockDay = state.settings.townUnlockDayByLevel[level];
+      const unlockHour = String(
+        state.settings.townUnlockHourByLevel[level]
+      ).padStart(2, "0");
+      return `Level ${level} towns unlock on Day ${unlockDay} at ${unlockHour}:00.`;
     }
     if (counts.towns >= CITY_RACE_DAILY_TOWN_LIMIT) {
       return `The Day ${state.currentDay} town capture limit has been reached.`;
@@ -440,8 +510,11 @@ export function getCityRaceTileStatus(
     return "locked";
   }
   if (tile.kind === "town") {
-    const unlockDay = getTownUnlockDay(getTileLevel(tile));
-    if (unlockDay === null || state.currentDay < unlockDay) return "locked";
+    const unlockMinute = getTownUnlockMinute(state, getTileLevel(tile));
+    const actionMinute = timestampToMinutes(
+      formatCityRaceTimestamp(state.currentDay, state.captureTime)
+    );
+    if (unlockMinute === null || actionMinute < unlockMinute) return "locked";
   }
   return getCityRaceCaptureError(state, tile, mapConfig) ? "blocked" : "capturable";
 }
@@ -549,8 +622,8 @@ export function calculateCityRaceScoreAtDayStart(
       Math.min(releaseMinute, cutoffMinute) - captureMinute
     );
     const productionPerHour =
-      CITY_RACE_PRODUCTION_PER_HOUR[
-        capture.level as keyof typeof CITY_RACE_PRODUCTION_PER_HOUR
+      state.settings.darkOilPerHourByTownLevel[
+        capture.level as CityRaceTownLevel
       ] ?? 0;
 
     production += Math.floor((productionPerHour * heldMinutes) / 60);
@@ -569,6 +642,19 @@ export function setCityRaceCaptureTime(
   captureTime: string
 ): CityRaceSimulation {
   return SERVER_TIME_PATTERN.test(captureTime) ? { ...state, captureTime } : state;
+}
+
+export function setCityRaceSimulationSettings(
+  state: CityRaceSimulation,
+  settings: CityRaceSimulationSettings
+): CityRaceSimulation {
+  return { ...state, settings: normalizeCityRaceSettings(settings) };
+}
+
+export function resetCityRaceSimulationSettings(
+  state: CityRaceSimulation
+): CityRaceSimulation {
+  return { ...state, settings: createDefaultCityRaceSettings() };
 }
 
 export function advanceCityRaceDay(state: CityRaceSimulation): CityRaceSimulation {
